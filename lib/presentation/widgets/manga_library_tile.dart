@@ -101,6 +101,8 @@ class MangaLibraryTile extends StatelessWidget {
 class _CoverThumbnail extends StatelessWidget {
   const _CoverThumbnail({this.imageUrl});
 
+  static const double _coverWidth = 96;
+
   final String? imageUrl;
 
   @override
@@ -125,15 +127,18 @@ class _CoverThumbnail extends StatelessWidget {
       child = _PlaceholderIcon(theme: theme);
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+    return SizedBox(
+      width: _coverWidth,
       child: AspectRatio(
         aspectRatio: 3 / 4,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+            ),
+            child: child,
           ),
-          child: child,
         ),
       ),
     );
