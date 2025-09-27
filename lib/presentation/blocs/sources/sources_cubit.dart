@@ -116,6 +116,29 @@ class SourcesCubit extends Cubit<SourcesState> {
     }
   }
 
+  /// Re-syncs a source immediately, updating its timestamp and forcing a
+  /// catalog refresh.
+  Future<void> forceResync(String sourceId) async {
+    final busy = <String>{...state.syncingSources, sourceId};
+    emit(state.copyWith(syncingSources: busy));
+    try {
+      await _syncSourceCatalog(sourceId: sourceId);
+      await _sourcePreferences?.markSynced(sourceId);
+    } catch (error) {
+      final updated = <String>{...busy}..remove(sourceId);
+      emit(
+        state.copyWith(
+          status: SourcesStatus.failure,
+          errorMessage: error.toString(),
+          syncingSources: updated,
+        ),
+      );
+      return;
+    }
+    final updated = <String>{...busy}..remove(sourceId);
+    emit(state.copyWith(syncingSources: updated, status: SourcesStatus.ready));
+  }
+
   @override
   Future<void> close() async {
     await _subscription?.cancel();

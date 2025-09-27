@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:manga_offline/core/di/service_locator.dart';
+import 'package:manga_offline/core/utils/source_preferences.dart';
 import 'package:manga_offline/domain/entities/manga_source.dart';
 import 'package:manga_offline/domain/entities/source_capability.dart';
 import 'package:manga_offline/presentation/blocs/sources/sources_cubit.dart';
@@ -112,58 +114,97 @@ class _SourceTile extends StatelessWidget {
         .map(_describeCapability)
         .whereType<String>()
         .join(' · ');
-
+    final prefs = serviceLocator.get<SourcePreferences>();
+    final lastSync = prefs.lastSync(source.id);
+    String lastSyncLabel = 'Nunca sincronizado';
+    if (lastSync != null) {
+      lastSyncLabel =
+          'Última sync: '
+          '${lastSync.day.toString().padLeft(2, '0')}/'
+          '${lastSync.month.toString().padLeft(2, '0')} '
+          '${lastSync.hour.toString().padLeft(2, '0')}:${lastSync.minute.toString().padLeft(2, '0')}';
+    }
     return Card(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    source.name,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  if (capabilities.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        capabilities,
-                        style: Theme.of(context).textTheme.bodySmall,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        source.name,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
+                      if (capabilities.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            capabilities,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          source.baseUrl,
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          lastSyncLabel,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: Colors.green.shade700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  children: [
+                    Switch.adaptive(
+                      value: source.isEnabled,
+                      onChanged: isProcessing
+                          ? null
+                          : (bool value) {
+                              context.read<SourcesCubit>().toggleSource(
+                                sourceId: source.id,
+                                isEnabled: value,
+                              );
+                            },
                     ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      source.baseUrl,
-                      style: Theme.of(context).textTheme.labelSmall,
+                    if (source.isEnabled)
+                      TextButton.icon(
+                        onPressed: isProcessing
+                            ? null
+                            : () => context.read<SourcesCubit>().forceResync(
+                                source.id,
+                              ),
+                        icon: const Icon(Icons.sync),
+                        label: const Text('Re-sync'),
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(0, 36),
+                        ),
+                      ),
+                  ],
+                ),
+                if (isProcessing)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 12),
+                    child: SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                   ),
-                ],
-              ),
+              ],
             ),
-            Switch.adaptive(
-              value: source.isEnabled,
-              onChanged: isProcessing
-                  ? null
-                  : (bool value) {
-                      context.read<SourcesCubit>().toggleSource(
-                        sourceId: source.id,
-                        isEnabled: value,
-                      );
-                    },
-            ),
-            if (isProcessing)
-              const Padding(
-                padding: EdgeInsets.only(left: 12),
-                child: SizedBox(
-                  height: 18,
-                  width: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
           ],
         ),
       ),
