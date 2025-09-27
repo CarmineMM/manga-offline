@@ -1,3 +1,4 @@
+import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
 
@@ -59,6 +60,52 @@ class RemoteMangaSummary {
   }
 }
 
+/// Lightweight summary returned by remote chapter endpoints.
+class RemoteChapterSummary {
+  const RemoteChapterSummary({
+    required this.externalId,
+    required this.mangaSlug,
+    required this.name,
+    required this.sourceId,
+    this.sourceName,
+    this.publishedAt,
+  });
+
+  /// External identifier provided by the remote API.
+  final String externalId;
+
+  /// Slug of the manga this chapter belongs to.
+  final String mangaSlug;
+
+  /// Name or label of the chapter (typically numeric).
+  final String name;
+
+  /// Identifier of the source producing the chapter.
+  final String sourceId;
+
+  /// Optional source name for display.
+  final String? sourceName;
+
+  /// Publication timestamp reported by the API.
+  final DateTime? publishedAt;
+
+  /// Converts the summary into the domain [Chapter] representation.
+  Chapter toDomain({int? indexFallback}) {
+    final parsedNumber = int.tryParse(name);
+    final number = parsedNumber ?? (indexFallback ?? 0);
+
+    return Chapter(
+      id: externalId,
+      mangaId: mangaSlug,
+      sourceId: sourceId,
+      sourceName: sourceName,
+      title: 'Capítulo $name',
+      number: number,
+      releaseDate: publishedAt,
+    );
+  }
+}
+
 /// Contract that all remote catalog data sources must implement.
 abstract class CatalogRemoteDataSource {
   /// Identifier that maps to the domain source configuration.
@@ -70,4 +117,9 @@ abstract class CatalogRemoteDataSource {
   /// Retrieves all manga summaries for the remote source, handling pagination
   /// internally when required.
   Future<List<RemoteMangaSummary>> fetchAllSeries();
+
+  /// Retrieves all chapter summaries for the manga identified by [mangaSlug].
+  Future<List<RemoteChapterSummary>> fetchAllChapters({
+    required String mangaSlug,
+  });
 }

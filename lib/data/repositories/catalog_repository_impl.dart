@@ -1,6 +1,9 @@
 import 'package:manga_offline/data/datasources/catalog_remote_datasource.dart';
 import 'package:manga_offline/data/datasources/manga_local_datasource.dart';
+import 'package:manga_offline/data/models/chapter_model.dart';
 import 'package:manga_offline/data/models/manga_model.dart';
+import 'package:manga_offline/domain/entities/chapter.dart';
+import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
 import 'package:manga_offline/domain/repositories/catalog_repository.dart';
 
@@ -55,13 +58,84 @@ class CatalogRepositoryImpl implements CatalogRepository {
     required String sourceId,
     required String mangaId,
   }) async {
-    final model = await _localDataSource.getManga(mangaId);
-    if (model == null) {
-      throw StateError('Manga $mangaId not found for source $sourceId');
-    }
-    final chapters = await _localDataSource.getChaptersForManga(
-      model.referenceId,
+    final remote = _resolveRemote(sourceId);
+    final remoteChapters = await remote.fetchAllChapters(mangaSlug: mangaId);
+    final existingModel = await _localDataSource.getManga(mangaId);
+    final existingChapterModels = await _localDataSource.getChaptersForManga(
+      mangaId,
     );
-    return model.toEntity(chapters: chapters);
+    final existingChaptersById = {
+      for (final model in existingChapterModels)
+        model.referenceId: model.toEntity(),
+    };
+
+    if (remoteChapters.isEmpty) {
+      if (existingModel != null) {
+        return existingModel.toEntity(chapters: existingChapterModels);
+      }
+      return Manga(
+        id: mangaId,
+        sourceId: sourceId,
+        sourceName: remote.sourceName,
+        title: mangaId,
+        status: DownloadStatus.notDownloaded,
+      );
+    }
+
+    final baseManga = existingModel != null
+        ? existingModel.toEntity(chapters: existingChapterModels)
+        : Manga(
+            id: mangaId,
+            sourceId: sourceId,
+            sourceName: remote.sourceName,
+            title: mangaId,
+            status: DownloadStatus.notDownloaded,
+          );
+
+    final chapterEntities = <Chapter>[];
+    for (var index = 0; index < remoteChapters.length; index += 1) {
+      final summary = remoteChapters[index];
+      final baseChapter = existingChaptersById[summary.externalId];
+      final chapter = summary.toDomain(
+        indexFallback: remoteChapters.length - index,
+      );
+      if (baseChapter != null) {
+        chapterEntities.add(
+          chapter.copyWith(
+            remoteUrl: baseChapter.remoteUrl,
+            localPath: baseChapter.localPath,
+            status: baseChapter.status,
+            totalPages: baseChapter.totalPages,
+            downloadedPages: baseChapter.downloadedPages,
+            lastReadAt: baseChapter.lastReadAt,
+            lastReadPage: baseChapter.lastReadPage,
+            pages: baseChapter.pages,
+          ),
+        );
+      } else {
+        chapterEntities.add(chapter);
+      }
+    }
+
+    chapterEntities.sort((a, b) => a.number.compareTo(b.number));
+
+    final updatedManga = baseManga.copyWith(
+      chapters: chapterEntities,
+      totalChapters: chapterEntities.length,
+      lastUpdated: DateTime.now(),
+    );
+
+    final mangaModel = MangaModel.fromEntity(updatedManga);
+    final chapterModels = chapterEntities
+        .map((chapter) => ChapterModel.fromEntity(chapter))
+        .toList(growable: false);
+
+    await _localDataSource.putManga(
+      mangaModel,
+      chapters: chapterModels,
+      replaceChapters: true,
+    );
+
+    return updatedManga;
   }
 }

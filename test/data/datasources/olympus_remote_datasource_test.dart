@@ -47,6 +47,62 @@ void main() {
       throwsA(isA<http.ClientException>()),
     );
   });
+
+  test('fetchAllChapters aggregates every page', () async {
+    final responses = <int, String>{
+      1: _chapterPagePayload(
+        currentPage: 1,
+        lastPage: 2,
+        entries: [
+          _chapterEntry(
+            id: 101,
+            name: '2',
+            publishedAt: '2025-01-01T00:00:00Z',
+          ),
+        ],
+      ),
+      2: _chapterPagePayload(
+        currentPage: 2,
+        lastPage: 2,
+        entries: [
+          _chapterEntry(
+            id: 100,
+            name: '1',
+            publishedAt: '2024-12-01T00:00:00Z',
+          ),
+        ],
+      ),
+    };
+
+    final client = MockClient((request) async {
+      expect(request.url.path, contains('manga-slug/chapters'));
+      final page = int.parse(request.url.queryParameters['page'] ?? '1');
+      final body = responses[page];
+      if (body == null) {
+        return http.Response('Not Found', 404);
+      }
+      return http.Response(body, 200);
+    });
+
+    final datasource = OlympusRemoteDataSource(httpClient: client);
+
+    final chapters = await datasource.fetchAllChapters(mangaSlug: 'manga-slug');
+
+    expect(chapters, hasLength(2));
+    expect(chapters.first.externalId, equals('101'));
+    expect(chapters.first.name, equals('2'));
+    expect(chapters.first.publishedAt, isNotNull);
+  });
+
+  test('fetchAllChapters throws on non-success status codes', () async {
+    final client = MockClient((request) async => http.Response('Error', 500));
+    final datasource = OlympusRemoteDataSource(httpClient: client);
+
+    expect(
+      () => datasource.fetchAllChapters(mangaSlug: 'manga-slug'),
+      throwsA(isA<http.ClientException>()),
+    );
+  });
 }
 
 String _pagePayload({
@@ -76,5 +132,30 @@ Map<String, dynamic> _seriesEntry({
     'name': name,
     'chapter_count': 1,
     'status': {'id': 1, 'name': 'Activo'},
+  };
+}
+
+String _chapterPagePayload({
+  required int currentPage,
+  required int lastPage,
+  required List<Map<String, dynamic>> entries,
+}) {
+  return jsonEncode({
+    'data': entries,
+    'meta': {'current_page': currentPage, 'last_page': lastPage},
+  });
+}
+
+Map<String, dynamic> _chapterEntry({
+  required int id,
+  required String name,
+  required String publishedAt,
+}) {
+  return {
+    'id': id,
+    'name': name,
+    'published_at': publishedAt,
+    'team': {'id': 1, 'name': 'Olympus'},
+    'read_by_auth': false,
   };
 }

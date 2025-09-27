@@ -35,6 +35,9 @@ void main() {
     const sourceName = 'Olympus Biblioteca';
     when(() => remote.sourceId).thenReturn(sourceId);
     when(() => remote.sourceName).thenReturn(sourceName);
+    when(
+      () => remote.fetchAllChapters(mangaSlug: any(named: 'mangaSlug')),
+    ).thenAnswer((_) async => const <RemoteChapterSummary>[]);
     repository = CatalogRepositoryImpl(
       localDataSource: local,
       remoteDataSources: {sourceId: remote},
@@ -117,44 +120,108 @@ void main() {
   });
 
   group('fetchMangaDetail', () {
-    test('returns stored manga with chapters', () async {
+    test('updates local storage with remote chapters', () async {
       const sourceId = 'olympus';
       final mangaModel = MangaModel()
         ..referenceId = 'slug'
         ..sourceId = sourceId
         ..title = 'Sample'
         ..status = DownloadStatus.notDownloaded;
-      final chapterModel = ChapterModel()
+      final existingChapterModel = ChapterModel()
         ..referenceId = 'chapter-1'
         ..mangaReferenceId = 'slug'
         ..sourceId = sourceId
         ..title = 'Capítulo 1'
         ..number = 1
-        ..status = DownloadStatus.notDownloaded;
+        ..status = DownloadStatus.downloaded
+        ..downloadedPages = 10
+        ..totalPages = 10;
+      final remoteChapters = [
+        const RemoteChapterSummary(
+          externalId: 'chapter-1',
+          mangaSlug: 'slug',
+          name: '1',
+          sourceId: sourceId,
+          sourceName: 'Olympus Biblioteca',
+          publishedAt: null,
+        ),
+        const RemoteChapterSummary(
+          externalId: 'chapter-2',
+          mangaSlug: 'slug',
+          name: '2',
+          sourceId: sourceId,
+          sourceName: 'Olympus Biblioteca',
+          publishedAt: null,
+        ),
+      ];
 
       when(() => local.getManga('slug')).thenAnswer((_) async => mangaModel);
       when(
         () => local.getChaptersForManga('slug'),
-      ).thenAnswer((_) async => [chapterModel]);
+      ).thenAnswer((_) async => [existingChapterModel]);
+      when(
+        () => remote.fetchAllChapters(mangaSlug: 'slug'),
+      ).thenAnswer((_) async => remoteChapters);
+      when(
+        () => local.putManga(
+          any(),
+          chapters: any(named: 'chapters'),
+          replaceChapters: any(named: 'replaceChapters'),
+        ),
+      ).thenAnswer((_) async {});
 
       final result = await repository.fetchMangaDetail(
         sourceId: sourceId,
         mangaId: 'slug',
       );
 
-      expect(result.id, equals('slug'));
+      expect(result.chapters, hasLength(2));
       expect(result.chapters.first.id, equals('chapter-1'));
+      expect(result.chapters.first.status, equals(DownloadStatus.downloaded));
+      expect(result.chapters.last.id, equals('chapter-2'));
+
+      verify(
+        () => local.putManga(
+          any(),
+          chapters: any(named: 'chapters'),
+          replaceChapters: true,
+        ),
+      ).called(1);
     });
 
-    test('throws when manga is not found', () async {
-      when(() => local.getManga(any())).thenAnswer((_) async => null);
-
+    test('returns minimal manga when not cached locally', () async {
       const sourceId = 'olympus';
-      expect(
-        () =>
-            repository.fetchMangaDetail(sourceId: sourceId, mangaId: 'missing'),
-        throwsStateError,
+      when(() => local.getManga('missing')).thenAnswer((_) async => null);
+      when(
+        () => local.getChaptersForManga('missing'),
+      ).thenAnswer((_) async => const <ChapterModel>[]);
+      when(() => remote.fetchAllChapters(mangaSlug: 'missing')).thenAnswer(
+        (_) async => const [
+          RemoteChapterSummary(
+            externalId: 'chapter-1',
+            mangaSlug: 'missing',
+            name: '1',
+            sourceId: sourceId,
+            sourceName: 'Olympus Biblioteca',
+            publishedAt: null,
+          ),
+        ],
       );
+      when(
+        () => local.putManga(
+          any(),
+          chapters: any(named: 'chapters'),
+          replaceChapters: any(named: 'replaceChapters'),
+        ),
+      ).thenAnswer((_) async {});
+
+      final result = await repository.fetchMangaDetail(
+        sourceId: sourceId,
+        mangaId: 'missing',
+      );
+
+      expect(result.id, equals('missing'));
+      expect(result.chapters, hasLength(1));
     });
   });
 }

@@ -6,14 +6,21 @@ import 'package:manga_offline/data/datasources/catalog_remote_datasource.dart';
 /// Remote data source in charge of fetching catalog information from the
 /// Olympus Biblioteca API.
 class OlympusRemoteDataSource implements CatalogRemoteDataSource {
-  OlympusRemoteDataSource({http.Client? httpClient, Uri? baseSeriesUri})
-    : _httpClient = httpClient ?? http.Client(),
-      _baseSeriesUri =
-          baseSeriesUri ??
-          Uri.parse('https://olympusbiblioteca.com/api/series');
+  OlympusRemoteDataSource({
+    http.Client? httpClient,
+    Uri? baseSeriesUri,
+    Uri? baseChaptersUri,
+  }) : _httpClient = httpClient ?? http.Client(),
+       _baseSeriesUri =
+           baseSeriesUri ??
+           Uri.parse('https://olympusbiblioteca.com/api/series'),
+       _baseChaptersUri =
+           baseChaptersUri ??
+           Uri.parse('https://dashboard.olympusbiblioteca.com/api/series');
 
   final http.Client _httpClient;
   final Uri _baseSeriesUri;
+  final Uri _baseChaptersUri;
 
   @override
   String get sourceId => 'olympus';
@@ -38,6 +45,27 @@ class OlympusRemoteDataSource implements CatalogRemoteDataSource {
     }
 
     return catalog;
+  }
+
+  @override
+  Future<List<RemoteChapterSummary>> fetchAllChapters({
+    required String mangaSlug,
+  }) async {
+    final List<RemoteChapterSummary> chapters = [];
+    var nextPage = 1;
+
+    while (true) {
+      final page = await _fetchChapterPage(slug: mangaSlug, page: nextPage);
+      chapters.addAll(page.items);
+
+      if (page.currentPage >= page.lastPage) {
+        break;
+      }
+
+      nextPage = page.currentPage + 1;
+    }
+
+    return chapters;
   }
 
   /// Releases resources associated with the underlying HTTP client.
@@ -97,6 +125,66 @@ class OlympusRemoteDataSource implements CatalogRemoteDataSource {
       status: status?['name'] as String?,
     );
   }
+
+  Future<_ChapterPage> _fetchChapterPage({
+    required String slug,
+    required int page,
+  }) async {
+    final uri = Uri(
+      scheme: _baseChaptersUri.scheme,
+      host: _baseChaptersUri.host,
+      port: _baseChaptersUri.hasPort ? _baseChaptersUri.port : null,
+      path: '${_baseChaptersUri.path}/$slug/chapters',
+      queryParameters: <String, String>{
+        'page': page.toString(),
+        'direction': 'desc',
+        'type': 'comic',
+      },
+    );
+
+    final response = await _httpClient.get(uri);
+    if (response.statusCode != 200) {
+      throw http.ClientException(
+        'Failed to fetch Olympus chapters page $page for $slug (status ${response.statusCode})',
+        uri,
+      );
+    }
+
+    final jsonPayload = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = (jsonPayload['data'] as List<dynamic>? ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .map((json) => _mapChapterSummary(slug, json))
+        .toList(growable: false);
+    final meta = jsonPayload['meta'] as Map<String, dynamic>?;
+    final currentPage = (meta?['current_page'] as num?)?.toInt() ?? page;
+    final lastPage = (meta?['last_page'] as num?)?.toInt() ?? currentPage;
+
+    return _ChapterPage(
+      items: data,
+      currentPage: currentPage,
+      lastPage: lastPage,
+    );
+  }
+
+  RemoteChapterSummary _mapChapterSummary(
+    String slug,
+    Map<String, dynamic> json,
+  ) {
+    final name = (json['name'] as String?)?.trim() ?? '';
+    final publishedAtRaw = json['published_at'] as String?;
+    final publishedAt = publishedAtRaw != null
+        ? DateTime.tryParse(publishedAtRaw)
+        : null;
+
+    return RemoteChapterSummary(
+      externalId: json['id'].toString(),
+      mangaSlug: slug,
+      name: name.isEmpty ? json['id'].toString() : name,
+      sourceId: sourceId,
+      sourceName: sourceName,
+      publishedAt: publishedAt,
+    );
+  }
 }
 
 class _SeriesPage {
@@ -107,6 +195,18 @@ class _SeriesPage {
   });
 
   final List<RemoteMangaSummary> items;
+  final int currentPage;
+  final int lastPage;
+}
+
+class _ChapterPage {
+  const _ChapterPage({
+    required this.items,
+    required this.currentPage,
+    required this.lastPage,
+  });
+
+  final List<RemoteChapterSummary> items;
   final int currentPage;
   final int lastPage;
 }
