@@ -105,4 +105,42 @@ void main() {
     expect(storedChapters.first.referenceId, equals('chapter-1'));
     expect(replaceChapters, isTrue);
   });
+
+  test('markMangaAsDownloaded delegates to datasource', () async {
+    when(() => local.markMangaAsDownloaded('manga-1')).thenAnswer((_) async {});
+
+    await repository.markMangaAsDownloaded('manga-1');
+
+    verify(() => local.markMangaAsDownloaded('manga-1')).called(1);
+  });
+
+  test('markChapterAsDownloaded delegates to datasource', () async {
+    when(
+      () => local.markChapterAsDownloaded('chapter-1'),
+    ).thenAnswer((_) async {});
+
+    await repository.markChapterAsDownloaded('chapter-1');
+
+    verify(() => local.markChapterAsDownloaded('chapter-1')).called(1);
+  });
+
+  test('getMangaDownloadStatus returns datasource value', () async {
+    when(
+      () => local.getMangaDownloadStatus('manga-1'),
+    ).thenAnswer((_) async => DownloadStatus.downloaded);
+
+    final status = await repository.getMangaDownloadStatus('manga-1');
+
+    expect(status, equals(DownloadStatus.downloaded));
+  });
+
+  test('getChapterDownloadStatus returns datasource value', () async {
+    when(
+      () => local.getChapterDownloadStatus('chapter-1'),
+    ).thenAnswer((_) async => DownloadStatus.downloading);
+
+    final status = await repository.getChapterDownloadStatus('chapter-1');
+
+    expect(status, equals(DownloadStatus.downloading));
+  });
 }

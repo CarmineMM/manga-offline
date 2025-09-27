@@ -3,21 +3,28 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/download_task.dart';
+import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
 import 'package:manga_offline/domain/entities/manga_source.dart';
 import 'package:manga_offline/domain/entities/source_capability.dart';
 import 'package:manga_offline/domain/repositories/catalog_repository.dart';
 import 'package:manga_offline/domain/repositories/download_repository.dart';
+import 'package:manga_offline/domain/repositories/manga_repository.dart';
 import 'package:manga_offline/domain/repositories/source_repository.dart';
 import 'package:manga_offline/domain/usecases/fetch_manga_detail.dart';
 import 'package:manga_offline/domain/usecases/fetch_source_catalog.dart';
 import 'package:manga_offline/domain/usecases/get_available_sources.dart';
+import 'package:manga_offline/domain/usecases/get_chapter_download_status.dart';
+import 'package:manga_offline/domain/usecases/get_manga_download_status.dart';
+import 'package:manga_offline/domain/usecases/mark_chapter_downloaded.dart';
+import 'package:manga_offline/domain/usecases/mark_manga_downloaded.dart';
 import 'package:manga_offline/domain/usecases/queue_chapter_download.dart';
 import 'package:manga_offline/domain/usecases/queue_manga_download.dart';
 import 'package:manga_offline/domain/usecases/sync_source_catalog.dart';
 import 'package:manga_offline/domain/usecases/update_source_selection.dart';
 import 'package:manga_offline/domain/usecases/watch_available_sources.dart';
 import 'package:manga_offline/domain/usecases/watch_download_queue.dart';
+import 'package:manga_offline/domain/usecases/watch_downloaded_mangas.dart';
 
 class _FakeSourceRepository implements SourceRepository {
   _FakeSourceRepository(this._sources);
@@ -97,6 +104,51 @@ class _FakeDownloadRepository implements DownloadRepository {
 
   void dispose() {
     _controller.close();
+  }
+}
+
+class _FakeMangaRepository implements MangaRepository {
+  final StreamController<List<Manga>> _controller =
+      StreamController<List<Manga>>.broadcast();
+  final Map<String, Manga> _stored = {};
+  final Map<String, DownloadStatus> _mangaStatuses = {};
+  final Map<String, DownloadStatus> _chapterStatuses = {};
+  String? lastMangaMarked;
+  String? lastChapterMarked;
+
+  void dispose() {
+    _controller.close();
+  }
+
+  @override
+  Stream<List<Manga>> watchLocalLibrary() => _controller.stream;
+
+  @override
+  Future<void> saveManga(Manga manga) async {
+    _stored[manga.id] = manga;
+    _controller.add(_stored.values.toList());
+  }
+
+  @override
+  Future<void> markMangaAsDownloaded(String mangaId) async {
+    lastMangaMarked = mangaId;
+    _mangaStatuses[mangaId] = DownloadStatus.downloaded;
+  }
+
+  @override
+  Future<void> markChapterAsDownloaded(String chapterId) async {
+    lastChapterMarked = chapterId;
+    _chapterStatuses[chapterId] = DownloadStatus.downloaded;
+  }
+
+  @override
+  Future<DownloadStatus?> getMangaDownloadStatus(String mangaId) async {
+    return _mangaStatuses[mangaId];
+  }
+
+  @override
+  Future<DownloadStatus?> getChapterDownloadStatus(String chapterId) async {
+    return _chapterStatuses[chapterId];
   }
 }
 
@@ -250,6 +302,69 @@ void main() {
       repository.emitQueue([task]);
 
       await expectation;
+    });
+  });
+
+  group('Manga download status use cases', () {
+    late _FakeMangaRepository repository;
+
+    setUp(() {
+      repository = _FakeMangaRepository();
+    });
+
+    tearDown(() {
+      repository.dispose();
+    });
+
+    test('WatchDownloadedMangas forwards stream', () async {
+      final useCase = WatchDownloadedMangas(repository);
+      final items = [
+        Manga(id: 'manga-1', sourceId: 'source-1', title: 'Manga 1'),
+      ];
+
+      final expectation = expectLater(useCase(), emits(items));
+
+      await repository.saveManga(items.first);
+
+      await expectation;
+    });
+
+    test('MarkMangaDownloaded updates repository', () async {
+      final useCase = MarkMangaDownloaded(repository);
+
+      await useCase('manga-1');
+
+      expect(repository.lastMangaMarked, equals('manga-1'));
+      final status = await repository.getMangaDownloadStatus('manga-1');
+      expect(status, equals(DownloadStatus.downloaded));
+    });
+
+    test('MarkChapterDownloaded updates repository', () async {
+      final useCase = MarkChapterDownloaded(repository);
+
+      await useCase('chapter-1');
+
+      expect(repository.lastChapterMarked, equals('chapter-1'));
+      final status = await repository.getChapterDownloadStatus('chapter-1');
+      expect(status, equals(DownloadStatus.downloaded));
+    });
+
+    test('GetMangaDownloadStatus reflects repository data', () async {
+      repository._mangaStatuses['manga-1'] = DownloadStatus.downloading;
+      final useCase = GetMangaDownloadStatus(repository);
+
+      final status = await useCase('manga-1');
+
+      expect(status, equals(DownloadStatus.downloading));
+    });
+
+    test('GetChapterDownloadStatus reflects repository data', () async {
+      repository._chapterStatuses['chapter-1'] = DownloadStatus.failed;
+      final useCase = GetChapterDownloadStatus(repository);
+
+      final status = await useCase('chapter-1');
+
+      expect(status, equals(DownloadStatus.failed));
     });
   });
 }

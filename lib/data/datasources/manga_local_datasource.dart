@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:isar/isar.dart';
 import 'package:manga_offline/data/models/chapter_model.dart';
 import 'package:manga_offline/data/models/manga_model.dart';
+import 'package:manga_offline/domain/entities/download_status.dart';
 
 /// Local data source responsible for persisting mangas in Isar.
 class MangaLocalDataSource {
@@ -71,6 +72,18 @@ class MangaLocalDataSource {
     return query.findAll();
   }
 
+  /// Retrieves a chapter by its external [referenceId].
+  Future<ChapterModel?> getChapter(String referenceId) {
+    final query = _chapterCollection.buildQuery<ChapterModel>(
+      filter: FilterCondition.equalTo(
+        property: r'referenceId',
+        value: referenceId,
+      ),
+      limit: 1,
+    );
+    return query.findFirst();
+  }
+
   /// Loads the stored chapters belonging to the [mangaReferenceId].
   Future<List<ChapterModel>> getChaptersForManga(String mangaReferenceId) {
     final query = _chapterCollection.buildQuery<ChapterModel>(
@@ -107,6 +120,84 @@ class MangaLocalDataSource {
     };
 
     return controller.stream;
+  }
+
+  /// Marks the given manga as downloaded and updates all persisted chapters.
+  Future<void> markMangaAsDownloaded(String referenceId) async {
+    final timestamp = DateTime.now();
+    await isar.writeTxn(() async {
+      final manga = await getManga(referenceId);
+      if (manga == null) {
+        return;
+      }
+
+      final chapters = await getChaptersForManga(referenceId);
+      if (chapters.isNotEmpty) {
+        for (final chapter in chapters) {
+          chapter.status = DownloadStatus.downloaded;
+          if (chapter.totalPages > 0) {
+            chapter.downloadedPages = chapter.totalPages;
+          }
+        }
+        await _chapterCollection.putAll(chapters);
+      }
+
+      manga.status = DownloadStatus.downloaded;
+      manga.downloadedChapters = manga.totalChapters > 0
+          ? manga.totalChapters
+          : (chapters.isNotEmpty ? chapters.length : manga.downloadedChapters);
+      manga.lastUpdated = timestamp;
+      await _mangaCollection.put(manga);
+    });
+  }
+
+  /// Marks the given chapter as downloaded and refreshes parent metadata.
+  Future<void> markChapterAsDownloaded(String referenceId) async {
+    final timestamp = DateTime.now();
+    await isar.writeTxn(() async {
+      final chapter = await getChapter(referenceId);
+      if (chapter == null) {
+        return;
+      }
+
+      chapter.status = DownloadStatus.downloaded;
+      if (chapter.totalPages > 0) {
+        chapter.downloadedPages = chapter.totalPages;
+      }
+      await _chapterCollection.put(chapter);
+
+      final manga = await getManga(chapter.mangaReferenceId);
+      if (manga == null) {
+        return;
+      }
+
+      final chapters = await getChaptersForManga(chapter.mangaReferenceId);
+      final downloadedChapters = chapters
+          .where((element) => element.status == DownloadStatus.downloaded)
+          .length;
+
+      manga.downloadedChapters = downloadedChapters;
+      if (manga.totalChapters > 0 &&
+          downloadedChapters >= manga.totalChapters) {
+        manga.status = DownloadStatus.downloaded;
+      } else if (downloadedChapters > 0) {
+        manga.status = DownloadStatus.downloading;
+      }
+      manga.lastUpdated = timestamp;
+      await _mangaCollection.put(manga);
+    });
+  }
+
+  /// Returns the download status of a stored manga, if available.
+  Future<DownloadStatus?> getMangaDownloadStatus(String referenceId) async {
+    final manga = await getManga(referenceId);
+    return manga?.status;
+  }
+
+  /// Returns the download status of a stored chapter, if available.
+  Future<DownloadStatus?> getChapterDownloadStatus(String referenceId) async {
+    final chapter = await getChapter(referenceId);
+    return chapter?.status;
   }
 
   Future<void> _deleteChaptersForManga(String referenceId) async {

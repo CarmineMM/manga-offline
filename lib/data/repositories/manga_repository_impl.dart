@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:manga_offline/data/datasources/manga_local_datasource.dart';
 import 'package:manga_offline/data/models/chapter_model.dart';
 import 'package:manga_offline/data/models/manga_model.dart';
+import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
 import 'package:manga_offline/domain/repositories/manga_repository.dart';
 
@@ -39,5 +40,25 @@ class MangaRepositoryImpl implements MangaRepository {
       chapters: chapters,
       replaceChapters: true,
     );
+  }
+
+  @override
+  Future<void> markMangaAsDownloaded(String mangaId) {
+    return _localDataSource.markMangaAsDownloaded(mangaId);
+  }
+
+  @override
+  Future<void> markChapterAsDownloaded(String chapterId) {
+    return _localDataSource.markChapterAsDownloaded(chapterId);
+  }
+
+  @override
+  Future<DownloadStatus?> getMangaDownloadStatus(String mangaId) {
+    return _localDataSource.getMangaDownloadStatus(mangaId);
+  }
+
+  @override
+  Future<DownloadStatus?> getChapterDownloadStatus(String chapterId) {
+    return _localDataSource.getChapterDownloadStatus(chapterId);
   }
 }
