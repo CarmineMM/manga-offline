@@ -9,8 +9,17 @@ import 'package:manga_offline/domain/usecases/watch_downloaded_mangas.dart';
 part 'library_state.dart';
 
 /// Cubit responsible for exposing the offline library state to the UI.
+///
+/// This cubit subscribes to the [WatchDownloadedMangas] use case and maintains
+/// an in-memory filter state (search query and selected source ids). It
+/// publishes filtered results via the [LibraryState] so presentation widgets
+/// can reactively render the library list and available source filters.
 class LibraryCubit extends Cubit<LibraryState> {
   /// Creates a cubit hooked to the [WatchDownloadedMangas] use case.
+  ///
+  /// The use case is expected to return a broadcast `Stream<List<Manga>>` and
+  /// the cubit will listen to updates, apply local filters, and emit
+  /// `LibraryState` snapshots.
   LibraryCubit(this._watchDownloadedMangas)
     : super(const LibraryState.initial());
 

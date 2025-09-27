@@ -16,6 +16,11 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 /// Returns the application documents directory.
+///
+/// This wrapper exists so tests and development code can inject an alternate
+/// directory provider (for example a temporary folder) without touching the
+/// repository implementation. In production it resolves to
+/// [getApplicationDocumentsDirectory].
 Future<Directory> _defaultDocumentsDirectory() =>
     getApplicationDocumentsDirectory();
 
@@ -23,7 +28,20 @@ final List<int> _fallbackImageBytes = base64Decode(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==',
 );
 
-/// Concrete implementation orchestrating downloads of chapters and mangas.
+/// Concrete implementation of [DownloadRepository].
+///
+/// Responsibilities:
+///  * Maintain a simple FIFO queue of chapter download tasks.
+///  * Fetch chapter pages via [CatalogRepository] and persist page assets to a
+///    per-chapter directory under the provided documents directory.
+///  * Emit queue snapshots through [watchDownloadQueue] so presentation layer
+///    can display progress and status. The implementation is resilient to
+///    individual page failures: when a page cannot be downloaded a small
+///    fallback image is written instead and the chapter download continues.
+///
+/// Notes for contributors: keep the queue state updates frequent and avoid
+/// long-running blocking operations on the main isolate; the repo uses a
+/// private processing loop and writes files using dart:io.
 class DownloadRepositoryImpl implements DownloadRepository {
   DownloadRepositoryImpl({
     required CatalogRepository catalogRepository,

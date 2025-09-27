@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
 
-/// Card-like tile representing a manga in the library list.
+/// A compact card used in the library list to present a single [Manga].
+///
+/// This widget intentionally keeps layout constraints strict for the cover
+/// thumbnail (fixed width / aspect ratio) to avoid unbounded constraints
+/// when used inside scrolling containers (e.g., `ListView`). It displays the
+/// title, optional source name, a short synopsis, a small progress indicator
+/// for downloaded chapters and a status chip.
 class MangaLibraryTile extends StatelessWidget {
   /// Creates a new [MangaLibraryTile].
   const MangaLibraryTile({super.key, required this.manga, this.onTap});

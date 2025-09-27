@@ -36,6 +36,7 @@ class OlympusRemoteDataSource implements CatalogRemoteDataSource {
     while (true) {
       final page = await _fetchSeriesPage(page: nextPage);
       catalog.addAll(page.items);
+      print('Fetched Olympus series page ${page.currentPage}/${page.lastPage}');
 
       if (page.currentPage >= page.lastPage) {
         break;

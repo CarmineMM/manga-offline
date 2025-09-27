@@ -11,8 +11,12 @@ import 'package:manga_offline/domain/repositories/catalog_repository.dart';
 import 'package:manga_offline/domain/repositories/manga_repository.dart';
 import 'package:manga_offline/domain/repositories/source_repository.dart';
 
-/// Simple in-memory implementation of [MangaRepository] to unblock the
-/// presentation layer while the real persistence stack is wired.
+/// In-memory implementation of [MangaRepository].
+///
+/// Used during development and UI prototyping. Stores manga and chapter
+/// metadata in memory and exposes `watchLocalLibrary()` as a broadcast stream.
+/// This repository is intentionally simple and synchronous in behaviour so it
+/// is easy to reason about in tests and demos.
 class InMemoryMangaRepository implements MangaRepository {
   final Map<String, Manga> _mangas = <String, Manga>{};
   late final StreamController<List<Manga>> _controller;
@@ -186,7 +190,11 @@ class InMemoryMangaRepository implements MangaRepository {
   }
 }
 
-/// In-memory catalog repository producing deterministic content for demos.
+/// In-memory implementation of [CatalogRepository].
+///
+/// Produces deterministic, generated content suitable for demos. It also
+/// forwards manga summaries into the provided [InMemoryMangaRepository] so
+/// the presentation layer always has a record of available mangas.
 class InMemoryCatalogRepository implements CatalogRepository {
   InMemoryCatalogRepository(this._mangaRepository);
 
@@ -295,6 +303,10 @@ class InMemoryCatalogRepository implements CatalogRepository {
 }
 
 /// In-memory implementation of [SourceRepository].
+///
+/// Provides a small set of sample `MangaSource` entries and allows toggling
+/// the selection state used by the UI. This is useful for development where
+/// multiple sources may be simulated without network access.
 class InMemorySourceRepository implements SourceRepository {
   final StreamController<List<MangaSource>> _controller =
       StreamController<List<MangaSource>>.broadcast();
@@ -337,6 +349,11 @@ class InMemorySourceRepository implements SourceRepository {
 }
 
 /// Sample catalog used by [InMemoryCatalogRepository].
+///
+/// The map keys are source identifiers. Each entry is a list of small
+/// `Manga` objects used to exercise the UI and the download flow during
+/// development. Replace or extend this map when adding additional demo
+/// scenarios.
 const Map<String, List<Manga>> _sampleCatalog = <String, List<Manga>>{
   'olympus': [
     Manga(

@@ -25,6 +25,10 @@ import 'package:manga_offline/presentation/blocs/sources/sources_cubit.dart';
 final GetIt serviceLocator = GetIt.instance;
 
 /// Registers shared dependencies for the application.
+///
+/// The function wires development-friendly implementations (in-memory
+/// repositories and a `DownloadRepositoryImpl` writing to a temporary
+/// directory). Call this early from `main()` in debug/development builds.
 Future<void> configureDependencies() async {
   if (serviceLocator.isRegistered<MangaRepository>()) {
     await serviceLocator.reset();
