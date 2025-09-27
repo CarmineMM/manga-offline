@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:manga_offline/data/repositories/download_repository_impl.dart';
 import 'package:manga_offline/data/stubs/in_memory_repositories.dart';
+import 'package:manga_offline/data/datasources/olympus_remote_datasource.dart';
 import 'package:manga_offline/domain/repositories/catalog_repository.dart';
 import 'package:manga_offline/domain/repositories/download_repository.dart';
 import 'package:manga_offline/domain/repositories/manga_repository.dart';
@@ -35,8 +36,10 @@ Future<void> configureDependencies() async {
   }
 
   final inMemoryMangaRepository = InMemoryMangaRepository();
+  final olympusRemote = OlympusRemoteDataSource();
   final inMemoryCatalogRepository = InMemoryCatalogRepository(
     inMemoryMangaRepository,
+    remoteDataSources: {olympusRemote.sourceId: olympusRemote},
   );
   final tempDownloadsDir = await Directory.systemTemp.createTemp(
     'manga_offline_downloads',

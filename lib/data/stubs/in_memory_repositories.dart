@@ -8,6 +8,7 @@ import 'package:manga_offline/domain/entities/manga_source.dart';
 import 'package:manga_offline/domain/entities/page_image.dart';
 import 'package:manga_offline/domain/entities/source_capability.dart';
 import 'package:manga_offline/domain/repositories/catalog_repository.dart';
+import 'package:manga_offline/data/datasources/catalog_remote_datasource.dart';
 import 'package:manga_offline/domain/repositories/manga_repository.dart';
 import 'package:manga_offline/domain/repositories/source_repository.dart';
 
@@ -196,9 +197,14 @@ class InMemoryMangaRepository implements MangaRepository {
 /// forwards manga summaries into the provided [InMemoryMangaRepository] so
 /// the presentation layer always has a record of available mangas.
 class InMemoryCatalogRepository implements CatalogRepository {
-  InMemoryCatalogRepository(this._mangaRepository);
+  InMemoryCatalogRepository(
+    this._mangaRepository, {
+    Map<String, CatalogRemoteDataSource>? remoteDataSources,
+  }) : _remoteDataSources =
+           remoteDataSources ?? const <String, CatalogRemoteDataSource>{};
 
   final InMemoryMangaRepository _mangaRepository;
+  final Map<String, CatalogRemoteDataSource> _remoteDataSources;
   final Map<String, List<Manga>> _catalogBySource = <String, List<Manga>>{};
   final Map<String, List<Chapter>> _chaptersByManga = <String, List<Chapter>>{};
   final Map<String, List<PageImage>> _pagesByChapter =
@@ -206,13 +212,41 @@ class InMemoryCatalogRepository implements CatalogRepository {
 
   @override
   Future<void> syncCatalog({required String sourceId}) async {
-    final samples = _sampleCatalog[sourceId] ?? const <Manga>[];
-    _catalogBySource[sourceId] = samples;
-    for (final manga in samples) {
+    developer.log(
+      'syncCatalog start | sourceId=$sourceId',
+      name: 'InMemoryCatalogRepository',
+    );
+    List<Manga> resolved = const <Manga>[];
+    final remote = _remoteDataSources[sourceId];
+    if (remote != null) {
+      try {
+        final summaries = await remote.fetchAllSeries();
+        resolved = summaries
+            .map((s) => s.toDomain(lastUpdated: DateTime.now()))
+            .toList(growable: false);
+        developer.log(
+          'syncCatalog remote fetched=${resolved.length}',
+          name: 'InMemoryCatalogRepository',
+        );
+      } catch (error, stack) {
+        developer.log(
+          'syncCatalog remote error falling back to samples',
+          name: 'InMemoryCatalogRepository',
+          error: error,
+          stackTrace: stack,
+        );
+      }
+    }
+    if (resolved.isEmpty) {
+      final samples = _sampleCatalog[sourceId] ?? const <Manga>[];
+      resolved = samples;
+    }
+    _catalogBySource[sourceId] = resolved;
+    for (final manga in resolved) {
       await _mangaRepository.saveManga(manga);
     }
     developer.log(
-      'Catálogo sincronizado | sourceId=$sourceId, mangas=${samples.length}',
+      'syncCatalog completed | sourceId=$sourceId, mangas=${resolved.length}',
       name: 'InMemoryCatalogRepository',
     );
   }
