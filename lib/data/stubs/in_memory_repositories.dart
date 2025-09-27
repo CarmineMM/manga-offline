@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:manga_offline/core/utils/source_preferences.dart';
 import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
@@ -472,6 +473,16 @@ class InMemoryCatalogRepository implements CatalogRepository {
 /// the selection state used by the UI. This is useful for development where
 /// multiple sources may be simulated without network access.
 class InMemorySourceRepository implements SourceRepository {
+  InMemorySourceRepository({SourcePreferences? sourcePreferences})
+    : _sourcePreferences = sourcePreferences {
+    final enabled = _sourcePreferences?.enabledSources() ?? const <String>{};
+    _sources.updateAll(
+      (key, value) => value.copyWith(isEnabled: enabled.contains(key)),
+    );
+    _emit();
+  }
+  final SourcePreferences? _sourcePreferences;
+
   final StreamController<List<MangaSource>> _controller =
       StreamController<List<MangaSource>>.broadcast();
   final Map<String, MangaSource> _sources = <String, MangaSource>{
@@ -483,10 +494,6 @@ class InMemorySourceRepository implements SourceRepository {
       capabilities: [SourceCapability.catalog, SourceCapability.detail],
     ),
   };
-
-  InMemorySourceRepository() {
-    _emit();
-  }
 
   void _emit() {
     _controller.add(_sources.values.toList(growable: false));
@@ -508,6 +515,7 @@ class InMemorySourceRepository implements SourceRepository {
     final existing = _sources[sourceId];
     if (existing == null) return;
     _sources[sourceId] = existing.copyWith(isEnabled: isEnabled);
+    await _sourcePreferences?.setEnabled(sourceId, isEnabled);
     _emit();
   }
 }

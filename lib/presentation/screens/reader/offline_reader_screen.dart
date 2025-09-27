@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:manga_offline/core/di/service_locator.dart';
+import 'package:manga_offline/core/utils/reader_preferences.dart';
 import 'package:manga_offline/domain/repositories/download_repository.dart';
 
 /// Simple offline reader that displays the already downloaded image files for
@@ -28,14 +29,17 @@ class OfflineReaderScreen extends StatefulWidget {
 
 class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
   final DownloadRepository _downloadRepository = serviceLocator();
+  final ReaderPreferences _readerPrefs = serviceLocator();
   late PageController _controller;
   List<String> _paths = <String>[];
   bool _loading = true;
+  bool _verticalMode = true;
 
   @override
   void initState() {
     super.initState();
     _controller = PageController(initialPage: widget.initialPage);
+    _verticalMode = _readerPrefs.mode == ReaderMode.vertical;
     _load();
   }
 
@@ -64,6 +68,18 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
             onPressed: _load,
             tooltip: 'Recargar',
           ),
+          IconButton(
+            icon: Icon(_verticalMode ? Icons.view_agenda : Icons.view_day),
+            tooltip: _verticalMode
+                ? 'Cambiar a paginado'
+                : 'Cambiar a vertical',
+            onPressed: () async {
+              setState(() => _verticalMode = !_verticalMode);
+              await _readerPrefs.setMode(
+                _verticalMode ? ReaderMode.vertical : ReaderMode.paged,
+              );
+            },
+          ),
         ],
       ),
       backgroundColor: Colors.black,
@@ -79,26 +95,26 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
                 textAlign: TextAlign.center,
               ),
             )
+          : _verticalMode
+          ? ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              itemCount: _paths.length,
+              itemBuilder: (context, index) {
+                final path = _paths[index];
+                return Padding(
+                  padding: EdgeInsets.only(
+                    bottom: index == _paths.length - 1 ? 0 : 12,
+                  ),
+                  child: _PageImageView(path: path),
+                );
+              },
+            )
           : PageView.builder(
               controller: _controller,
               itemCount: _paths.length,
               itemBuilder: (context, index) {
                 final path = _paths[index];
-                return InteractiveViewer(
-                  minScale: 0.7,
-                  maxScale: 4,
-                  child: Center(
-                    child: Image.file(
-                      File(path),
-                      fit: BoxFit.contain,
-                      errorBuilder: (c, e, s) => const Icon(
-                        Icons.broken_image,
-                        color: Colors.white70,
-                        size: 64,
-                      ),
-                    ),
-                  ),
-                );
+                return _PageImageView(path: path);
               },
             ),
     );
@@ -108,5 +124,25 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+}
+
+class _PageImageView extends StatelessWidget {
+  const _PageImageView({required this.path});
+  final String path;
+  @override
+  Widget build(BuildContext context) {
+    return InteractiveViewer(
+      minScale: 0.7,
+      maxScale: 4,
+      child: Center(
+        child: Image.file(
+          File(path),
+          fit: BoxFit.contain,
+          errorBuilder: (c, e, s) =>
+              const Icon(Icons.broken_image, color: Colors.white70, size: 64),
+        ),
+      ),
+    );
   }
 }

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:manga_offline/core/utils/source_preferences.dart';
 import 'package:manga_offline/domain/entities/manga_source.dart';
 import 'package:manga_offline/domain/usecases/get_available_sources.dart';
 import 'package:manga_offline/domain/usecases/sync_source_catalog.dart';
@@ -18,16 +19,19 @@ class SourcesCubit extends Cubit<SourcesState> {
     required GetAvailableSources getAvailableSources,
     required UpdateSourceSelection updateSourceSelection,
     required SyncSourceCatalog syncSourceCatalog,
+    SourcePreferences? sourcePreferences,
   }) : _watchAvailableSources = watchAvailableSources,
        _getAvailableSources = getAvailableSources,
        _updateSourceSelection = updateSourceSelection,
        _syncSourceCatalog = syncSourceCatalog,
+       _sourcePreferences = sourcePreferences,
        super(const SourcesState.initial());
 
   final WatchAvailableSources _watchAvailableSources;
   final GetAvailableSources _getAvailableSources;
   final UpdateSourceSelection _updateSourceSelection;
   final SyncSourceCatalog _syncSourceCatalog;
+  final SourcePreferences? _sourcePreferences;
 
   StreamSubscription<List<MangaSource>>? _subscription;
 
@@ -82,7 +86,12 @@ class SourcesCubit extends Cubit<SourcesState> {
     try {
       await _updateSourceSelection(sourceId: sourceId, isEnabled: isEnabled);
       if (isEnabled) {
-        await _syncSourceCatalog(sourceId: sourceId);
+        final alreadySynced =
+            _sourcePreferences?.isSourceSynced(sourceId) ?? false;
+        if (!alreadySynced) {
+          await _syncSourceCatalog(sourceId: sourceId);
+          await _sourcePreferences?.markSynced(sourceId);
+        }
       }
     } catch (error) {
       final updated = <String>{...busy}..remove(sourceId);

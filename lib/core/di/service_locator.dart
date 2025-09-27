@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:manga_offline/data/datasources/cache/page_cache_datasource.dart';
+import 'package:manga_offline/core/utils/reader_preferences.dart';
+import 'package:manga_offline/core/utils/source_preferences.dart';
 
 import 'package:manga_offline/data/repositories/download_repository_impl.dart';
 import 'package:manga_offline/data/stubs/in_memory_repositories.dart';
@@ -71,12 +73,20 @@ Future<void> configureDependencies() async {
     documentsDirectoryProvider: () async => tempDownloadsDir,
   );
 
+  final readerPrefs = await ReaderPreferences.create();
+  final sourcePrefs = await SourcePreferences.create();
+  final inMemorySourceRepository = InMemorySourceRepository(
+    sourcePreferences: sourcePrefs,
+  );
+
   serviceLocator
     ..registerSingleton<MangaRepository>(inMemoryMangaRepository)
     ..registerSingleton<CatalogRepository>(inMemoryCatalogRepository)
-    ..registerSingleton<SourceRepository>(InMemorySourceRepository())
+    ..registerSingleton<SourceRepository>(inMemorySourceRepository)
     ..registerSingleton<DownloadRepository>(downloadRepository)
     ..registerSingleton<PageCacheDataSource>(pageCache)
+    ..registerSingleton<ReaderPreferences>(readerPrefs)
+    ..registerSingleton<SourcePreferences>(sourcePrefs)
     ..registerLazySingleton(() => WatchDownloadedMangas(serviceLocator()))
     ..registerLazySingleton(() => WatchDownloadQueue(serviceLocator()))
     ..registerLazySingleton(() => FetchMangaDetail(serviceLocator()))
@@ -101,6 +111,7 @@ Future<void> configureDependencies() async {
         getAvailableSources: serviceLocator(),
         updateSourceSelection: serviceLocator(),
         syncSourceCatalog: serviceLocator(),
+        sourcePreferences: serviceLocator<SourcePreferences>(),
       ),
     );
 }
