@@ -8,6 +8,7 @@ import 'package:manga_offline/domain/usecases/fetch_manga_detail.dart';
 import 'package:manga_offline/domain/usecases/queue_chapter_download.dart';
 import 'package:manga_offline/domain/usecases/watch_downloaded_mangas.dart';
 import 'package:manga_offline/presentation/blocs/manga_detail/manga_detail_cubit.dart';
+import '../../data/in_memory_reading_progress_datasource.dart';
 
 class _FakeDownloadRepository implements DownloadRepository {
   @override
@@ -18,6 +19,16 @@ class _FakeDownloadRepository implements DownloadRepository {
 
   @override
   Stream<List<DownloadTask>> watchDownloadQueue() => const Stream.empty();
+
+  @override
+  Future<List<String>> listLocalChapterPages({
+    required String chapterId,
+    required String mangaId,
+    required String sourceId,
+  }) async {
+    // Return an empty list for tests; adjust to match expected return type if needed.
+    return const <String>[];
+  }
 }
 
 void main() {
@@ -39,6 +50,7 @@ void main() {
         fetchMangaDetail: fetchMangaDetail,
         watchDownloadedMangas: watchDownloadedMangas,
         queueChapterDownload: queueChapterDownload,
+        readingProgressDataSource: InMemoryReadingProgressDataSource(),
       );
     });
 

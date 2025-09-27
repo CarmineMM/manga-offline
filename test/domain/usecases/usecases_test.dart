@@ -109,6 +109,16 @@ class _FakeDownloadRepository implements DownloadRepository {
   @override
   Stream<List<DownloadTask>> watchDownloadQueue() => _controller.stream;
 
+  @override
+  Future<List<String>> listLocalChapterPages({
+    required String chapterId,
+    required String mangaId,
+    required String sourceId,
+  }) async {
+    // For use case tests we don't rely on actual files; return empty list.
+    return const <String>[];
+  }
+
   void emitQueue(List<DownloadTask> queue) {
     _controller.add(queue);
   }

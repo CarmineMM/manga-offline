@@ -4,6 +4,7 @@ import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:manga_offline/data/datasources/cache/page_cache_datasource.dart';
 import 'package:manga_offline/data/datasources/cache/reading_progress_datasource.dart';
+import 'package:manga_offline/data/models/reading_progress_entity.g.dart';
 import 'package:manga_offline/core/utils/reader_preferences.dart';
 import 'package:manga_offline/core/utils/source_preferences.dart';
 
