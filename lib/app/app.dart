@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:manga_offline/presentation/screens/library/library_screen.dart';
+import 'package:manga_offline/presentation/screens/home/main_shell.dart';
 
 /// Root widget for the Manga Offline application.
 ///
@@ -17,7 +17,8 @@ class MangaOfflineApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const LibraryScreen(),
+      debugShowCheckedModeBanner: false,
+      home: const MainShell(),
     );
   }
 }
