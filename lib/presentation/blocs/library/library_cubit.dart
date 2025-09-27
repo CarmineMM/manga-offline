@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
@@ -18,10 +19,18 @@ class LibraryCubit extends Cubit<LibraryState> {
 
   /// Starts listening to local library updates.
   void start() {
+    _log('Iniciando escucha de biblioteca local');
     emit(state.copyWith(status: LibraryStatus.loading));
     _subscription?.cancel();
     _subscription = _watchDownloadedMangas().listen(
       (mangas) {
+        _log(
+          'Actualización recibida con ${mangas.length} mangas',
+          payload: {
+            'seleccionados': state.selectedSourceIds.length,
+            'busqueda': state.searchQuery,
+          },
+        );
         final sources = _buildSourceInfo(mangas);
         final validSelected = state.selectedSourceIds
             .where((id) => sources.any((source) => source.id == id))
@@ -42,6 +51,11 @@ class LibraryCubit extends Cubit<LibraryState> {
         );
       },
       onError: (Object error, StackTrace stackTrace) {
+        _log(
+          'Error al observar la biblioteca',
+          error: error,
+          stack: stackTrace,
+        );
         emit(state.copyWith(status: LibraryStatus.failure));
       },
     );
@@ -49,6 +63,7 @@ class LibraryCubit extends Cubit<LibraryState> {
 
   /// Updates the current search query and recomputes visible mangas.
   void updateSearchQuery(String query) {
+    _log('Actualizando búsqueda de biblioteca', payload: {'query': query});
     final filtered = _applyFilters(
       state.allMangas,
       query,
@@ -63,6 +78,11 @@ class LibraryCubit extends Cubit<LibraryState> {
     if (!updatedSelection.remove(sourceId)) {
       updatedSelection.add(sourceId);
     }
+
+    _log(
+      'Filtro de fuente actualizado',
+      payload: {'fuente': sourceId, 'seleccionados': updatedSelection.length},
+    );
 
     final filtered = _applyFilters(
       state.allMangas,
@@ -80,12 +100,28 @@ class LibraryCubit extends Cubit<LibraryState> {
 
   /// Clears all filters applied to the library.
   void resetFilters() {
+    _log('Reiniciando filtros de biblioteca');
     emit(
       state.copyWith(
         searchQuery: '',
         selectedSourceIds: <String>{},
         filteredMangas: state.allMangas,
       ),
+    );
+  }
+
+  void _log(
+    String message, {
+    Map<String, Object?>? payload,
+    Object? error,
+    StackTrace? stack,
+  }) {
+    final suffix = payload == null || payload.isEmpty ? '' : ' | $payload';
+    developer.log(
+      '$message$suffix',
+      name: 'LibraryCubit',
+      error: error,
+      stackTrace: stack,
     );
   }
 

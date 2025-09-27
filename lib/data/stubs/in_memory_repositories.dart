@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
@@ -202,10 +203,18 @@ class InMemoryCatalogRepository implements CatalogRepository {
     for (final manga in samples) {
       await _mangaRepository.saveManga(manga);
     }
+    developer.log(
+      'Catálogo sincronizado | sourceId=$sourceId, mangas=${samples.length}',
+      name: 'InMemoryCatalogRepository',
+    );
   }
 
   @override
   Future<List<Manga>> fetchCatalog({required String sourceId}) async {
+    developer.log(
+      'fetchCatalog | sourceId=$sourceId',
+      name: 'InMemoryCatalogRepository',
+    );
     return List<Manga>.from(_catalogBySource[sourceId] ?? const <Manga>[]);
   }
 
@@ -260,6 +269,10 @@ class InMemoryCatalogRepository implements CatalogRepository {
   }) async {
     final existing = _pagesByChapter[chapterId];
     if (existing != null) {
+      developer.log(
+        'Páginas en caché para capítulo $chapterId (count=${existing.length})',
+        name: 'InMemoryCatalogRepository',
+      );
       return existing;
     }
 
@@ -273,6 +286,10 @@ class InMemoryCatalogRepository implements CatalogRepository {
       );
     });
     _pagesByChapter[chapterId] = pages;
+    developer.log(
+      'Generadas ${pages.length} páginas ficticias para $chapterId',
+      name: 'InMemoryCatalogRepository',
+    );
     return pages;
   }
 }
@@ -344,6 +361,71 @@ const Map<String, List<Manga>> _sampleCatalog = <String, List<Manga>>{
       coverImageUrl:
           'https://dashboard.olympusbiblioteca.com/storage/comics/covers/1279/Accidentalmente-lg.webp',
       totalChapters: 10,
+      downloadedChapters: 0,
+      status: DownloadStatus.notDownloaded,
+    ),
+    Manga(
+      id: 'ecos-del-inframundo',
+      sourceId: 'olympus',
+      sourceName: 'Olympus Biblioteca',
+      title: 'Ecos del Inframundo',
+      synopsis:
+          'Un grupo de exorcistas enfrenta criaturas ancestrales en ciudades modernas.',
+      coverImageUrl:
+          'https://dashboard.olympusbiblioteca.com/storage/comics/covers/1188/ecos_hero.webp',
+      totalChapters: 64,
+      downloadedChapters: 0,
+      status: DownloadStatus.notDownloaded,
+    ),
+    Manga(
+      id: 'vinculos-de-plata',
+      sourceId: 'olympus',
+      sourceName: 'Olympus Biblioteca',
+      title: 'Vínculos de Plata',
+      synopsis:
+          'Dos hermanas descubren secretos familiares mientras dominan la alquimia.',
+      coverImageUrl:
+          'https://dashboard.olympusbiblioteca.com/storage/comics/covers/1203/vinculos-lg.webp',
+      totalChapters: 38,
+      downloadedChapters: 0,
+      status: DownloadStatus.notDownloaded,
+    ),
+    Manga(
+      id: 'ultimos-guerreros-del-zenith',
+      sourceId: 'olympus',
+      sourceName: 'Olympus Biblioteca',
+      title: 'Últimos Guerreros del Zenith',
+      synopsis:
+          'Mercenarios espaciales defienden colonias perdidas contra imperios galácticos.',
+      coverImageUrl:
+          'https://dashboard.olympusbiblioteca.com/storage/comics/covers/1145/zenith-lg.webp',
+      totalChapters: 52,
+      downloadedChapters: 0,
+      status: DownloadStatus.notDownloaded,
+    ),
+    Manga(
+      id: 'cronicas-del-bosque-eter',
+      sourceId: 'olympus',
+      sourceName: 'Olympus Biblioteca',
+      title: 'Crónicas del Bosque Éter',
+      synopsis:
+          'Guardianes mágicos protegen un bosque viviente de invasores tecnológicos.',
+      coverImageUrl:
+          'https://dashboard.olympusbiblioteca.com/storage/comics/covers/1122/eter-lg.webp',
+      totalChapters: 21,
+      downloadedChapters: 0,
+      status: DownloadStatus.notDownloaded,
+    ),
+    Manga(
+      id: 'reliquias-de-aurora',
+      sourceId: 'olympus',
+      sourceName: 'Olympus Biblioteca',
+      title: 'Reliquias de Aurora',
+      synopsis:
+          'Un arqueólogo rebelde busca artefactos prohibidos que alteran el tiempo.',
+      coverImageUrl:
+          'https://dashboard.olympusbiblioteca.com/storage/comics/covers/1199/aurora-lg.webp',
+      totalChapters: 47,
       downloadedChapters: 0,
       status: DownloadStatus.notDownloaded,
     ),
