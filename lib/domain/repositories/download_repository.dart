@@ -12,4 +12,12 @@ abstract interface class DownloadRepository {
 
   /// Watches the download queue, emitting updates as tasks progress.
   Stream<List<DownloadTask>> watchDownloadQueue();
+
+  /// Lists local image file paths for a downloaded chapter. Returns empty if
+  /// the chapter directory is missing or no files found.
+  Future<List<String>> listLocalChapterPages({
+    required String sourceId,
+    required String mangaId,
+    required String chapterId,
+  });
 }

@@ -371,6 +371,26 @@ class DownloadRepositoryImpl implements DownloadRepository {
       stackTrace: stack,
     );
   }
+
+  @override
+  Future<List<String>> listLocalChapterPages({
+    required String sourceId,
+    required String mangaId,
+    required String chapterId,
+  }) async {
+    final documents = await _documentsDirectoryProvider();
+    final dir = Directory(
+      p.join(documents.path, 'manga_offline', sourceId, mangaId, chapterId),
+    );
+    if (!await dir.exists()) return <String>[];
+    final files = await dir
+        .list()
+        .where((e) => e is File)
+        .cast<File>()
+        .toList();
+    files.sort((a, b) => a.path.compareTo(b.path));
+    return files.map((f) => f.path).toList(growable: false);
+  }
 }
 
 class _DownloadJob {

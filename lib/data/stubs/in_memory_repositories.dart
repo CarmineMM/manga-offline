@@ -11,6 +11,7 @@ import 'package:manga_offline/domain/repositories/catalog_repository.dart';
 import 'package:manga_offline/data/datasources/catalog_remote_datasource.dart';
 import 'package:manga_offline/domain/repositories/manga_repository.dart';
 import 'package:manga_offline/domain/repositories/source_repository.dart';
+import 'package:manga_offline/data/datasources/cache/page_cache_datasource.dart';
 
 /// In-memory implementation of [MangaRepository].
 ///
@@ -200,8 +201,10 @@ class InMemoryCatalogRepository implements CatalogRepository {
   InMemoryCatalogRepository(
     this._mangaRepository, {
     Map<String, CatalogRemoteDataSource>? remoteDataSources,
+    PageCacheDataSource? pageCache,
   }) : _remoteDataSources =
-           remoteDataSources ?? const <String, CatalogRemoteDataSource>{};
+           remoteDataSources ?? const <String, CatalogRemoteDataSource>{},
+       _pageCache = pageCache;
 
   final InMemoryMangaRepository _mangaRepository;
   final Map<String, CatalogRemoteDataSource> _remoteDataSources;
@@ -209,6 +212,7 @@ class InMemoryCatalogRepository implements CatalogRepository {
   final Map<String, List<Chapter>> _chaptersByManga = <String, List<Chapter>>{};
   final Map<String, List<PageImage>> _pagesByChapter =
       <String, List<PageImage>>{};
+  final PageCacheDataSource? _pageCache;
 
   @override
   Future<void> syncCatalog({required String sourceId}) async {
@@ -336,6 +340,7 @@ class InMemoryCatalogRepository implements CatalogRepository {
     required String mangaId,
     required String chapterId,
   }) async {
+    // 1. Cache en memoria (rápido)
     final cache = _pagesByChapter[chapterId];
     if (cache != null) {
       developer.log(
@@ -343,6 +348,42 @@ class InMemoryCatalogRepository implements CatalogRepository {
         name: 'InMemoryCatalogRepository',
       );
       return cache;
+    }
+
+    // 2. Cache persistente (Isar) si está disponible
+    if (_pageCache != null) {
+      try {
+        final persisted = await _pageCache.getChapterPages(
+          sourceId: sourceId,
+          mangaSlug: mangaId,
+          chapterId: chapterId,
+        );
+        if (persisted.isNotEmpty) {
+          final mapped = persisted
+              .map(
+                (e) => PageImage(
+                  id: '${chapterId}-${e.pageNumber}',
+                  chapterId: chapterId,
+                  pageNumber: e.pageNumber,
+                  remoteUrl: e.imageUrl,
+                ),
+              )
+              .toList(growable: false);
+          _pagesByChapter[chapterId] = mapped;
+          developer.log(
+            'fetchChapterPages persistent cache hit chapter=$chapterId pages=${mapped.length}',
+            name: 'InMemoryCatalogRepository',
+          );
+          return mapped;
+        }
+      } catch (error, stack) {
+        developer.log(
+          'fetchChapterPages persistent cache error (ignored)',
+          name: 'InMemoryCatalogRepository',
+          error: error,
+          stackTrace: stack,
+        );
+      }
     }
 
     final remote = _remoteDataSources[sourceId];
@@ -361,6 +402,35 @@ class InMemoryCatalogRepository implements CatalogRepository {
         );
         if (mapped.isNotEmpty) {
           _pagesByChapter[chapterId] = mapped;
+          // Guardar en cache persistente (sólo si no es fallback)
+          if (_pageCache != null) {
+            try {
+              await _pageCache.putChapterPages(
+                sourceId: sourceId,
+                mangaSlug: mangaId,
+                chapterId: chapterId,
+                pages: mapped
+                    .map(
+                      (p) => PageEntity()
+                        ..pageNumber = p.pageNumber
+                        ..imageUrl = p.remoteUrl ?? ''
+                        ..checksum = null,
+                    )
+                    .toList(growable: false),
+              );
+              developer.log(
+                'fetchChapterPages persisted chapter=$chapterId pages=${mapped.length}',
+                name: 'InMemoryCatalogRepository',
+              );
+            } catch (error, stack) {
+              developer.log(
+                'fetchChapterPages persist error (ignored) chapter=$chapterId',
+                name: 'InMemoryCatalogRepository',
+                error: error,
+                stackTrace: stack,
+              );
+            }
+          }
           return mapped;
         } else {
           developer.log(

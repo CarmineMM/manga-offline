@@ -5,8 +5,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:manga_offline/core/di/service_locator.dart';
 import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
+import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/presentation/blocs/manga_detail/manga_detail_cubit.dart';
 import 'package:manga_offline/presentation/widgets/chapter_list_tile.dart';
+import 'package:manga_offline/presentation/screens/reader/offline_reader_screen.dart';
 
 /// Displays the list of chapters for a given manga.
 class ChapterListScreen extends StatelessWidget {
@@ -132,10 +134,24 @@ class _ChapterListBody extends StatelessWidget {
                 );
               },
               onReadOffline: (Chapter selected) {
-                _showMessage(
-                  context,
-                  'Preparando el lector offline para ${selected.title}.',
-                );
+                if (selected.status == DownloadStatus.downloaded) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => OfflineReaderScreen(
+                        sourceId: selected.sourceId,
+                        mangaId: selected.mangaId,
+                        chapterId: selected.id,
+                        chapterTitle: selected.title,
+                        initialPage: (selected.lastReadPage ?? 1) - 1,
+                      ),
+                    ),
+                  );
+                } else {
+                  _showMessage(
+                    context,
+                    'Preparando el lector offline para ${selected.title}.',
+                  );
+                }
               },
             ),
           );

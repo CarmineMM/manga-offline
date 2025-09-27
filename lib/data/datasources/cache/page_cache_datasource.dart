@@ -56,6 +56,9 @@ abstract interface class PageCacheDataSource {
   });
 }
 
+/// The generated part file provides the `pageEntitys` accessor.
+/// Avoid defining a duplicate extension here to prevent member conflicts.
+
 class IsarPageCacheDataSource implements PageCacheDataSource {
   IsarPageCacheDataSource(this._isar);
 
