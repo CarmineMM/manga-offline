@@ -1,5 +1,8 @@
 import 'package:get_it/get_it.dart';
 import 'dart:io';
+import 'package:isar/isar.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:manga_offline/data/datasources/cache/page_cache_datasource.dart';
 
 import 'package:manga_offline/data/repositories/download_repository_impl.dart';
 import 'package:manga_offline/data/stubs/in_memory_repositories.dart';
@@ -35,6 +38,24 @@ Future<void> configureDependencies() async {
     await serviceLocator.reset();
   }
 
+  // Inicializa Isar (persistencia local). Añadimos PageEntity para cache de páginas.
+  final appDir = await getApplicationDocumentsDirectory();
+  // Nota: PageEntitySchema se genera vía build_runner. Asegúrate de ejecutar
+  // `flutter pub run build_runner build --delete-conflicting-outputs`
+  // después de este cambio para evitar errores de símbolo no definido.
+  late final Isar isar;
+  try {
+    isar = await Isar.open(
+      [PageEntitySchema],
+      directory: appDir.path,
+      inspector: false,
+    );
+  } catch (e) {
+    // En entorno de test sin generar aún el código, podemos re-lanzar para hacerlo visible.
+    rethrow;
+  }
+  final pageCache = IsarPageCacheDataSource(isar);
+
   final inMemoryMangaRepository = InMemoryMangaRepository();
   final olympusRemote = OlympusRemoteDataSource();
   final inMemoryCatalogRepository = InMemoryCatalogRepository(
@@ -55,6 +76,7 @@ Future<void> configureDependencies() async {
     ..registerSingleton<CatalogRepository>(inMemoryCatalogRepository)
     ..registerSingleton<SourceRepository>(InMemorySourceRepository())
     ..registerSingleton<DownloadRepository>(downloadRepository)
+    ..registerSingleton<PageCacheDataSource>(pageCache)
     ..registerLazySingleton(() => WatchDownloadedMangas(serviceLocator()))
     ..registerLazySingleton(() => WatchDownloadQueue(serviceLocator()))
     ..registerLazySingleton(() => FetchMangaDetail(serviceLocator()))
