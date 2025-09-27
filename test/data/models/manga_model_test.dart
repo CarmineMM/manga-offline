@@ -13,6 +13,7 @@ void main() {
       final chapter = Chapter(
         id: 'chapter-1',
         mangaId: 'manga-1',
+        sourceId: 'source-1',
         title: 'Capítulo 1',
         number: 1,
         status: DownloadStatus.downloaded,
@@ -21,6 +22,8 @@ void main() {
       );
       final manga = Manga(
         id: 'manga-1',
+        sourceId: 'source-1',
+        sourceName: 'Fuente Uno',
         title: 'Manga Test',
         synopsis: 'A sample synopsis',
         coverImageUrl: 'https://example.com/cover.jpg',
@@ -59,6 +62,7 @@ void main() {
       final chapter = Chapter(
         id: 'chapter-1',
         mangaId: 'manga-1',
+        sourceId: 'source-1',
         title: 'Capítulo 1',
         number: 1,
         remoteUrl: 'https://example.com/chapter-1',
@@ -74,9 +78,11 @@ void main() {
 
       expect(chapterModel.pageIds, contains('page-1'));
       expect(chapterModel.status, equals(DownloadStatus.downloaded));
+      expect(chapterModel.sourceId, equals('source-1'));
 
       final restoredChapter = chapterModel.toEntity(pages: [pageModel]);
       expect(restoredChapter.id, equals(chapter.id));
+      expect(restoredChapter.sourceId, equals('source-1'));
       expect(restoredChapter.pages.length, equals(1));
       expect(restoredChapter.pages.first.localPath, equals(page.localPath));
     });
@@ -85,12 +91,15 @@ void main() {
       final chapterModel = ChapterModel()
         ..referenceId = 'chapter-1'
         ..mangaReferenceId = 'manga-1'
+        ..sourceId = 'source-1'
         ..title = 'Capítulo 1'
         ..number = 1
         ..status = DownloadStatus.notDownloaded;
 
       final mangaModel = MangaModel()
         ..referenceId = 'manga-1'
+        ..sourceId = 'source-1'
+        ..sourceName = 'Fuente Uno'
         ..title = 'Manga Test'
         ..status = DownloadStatus.notDownloaded
         ..chapterIds = ['chapter-1'];
@@ -98,6 +107,8 @@ void main() {
       final entity = mangaModel.toEntity(chapters: [chapterModel]);
 
       expect(entity.id, equals('manga-1'));
+      expect(entity.sourceId, equals('source-1'));
+      expect(entity.sourceName, equals('Fuente Uno'));
       expect(entity.title, equals('Manga Test'));
       expect(entity.chapters, hasLength(1));
       expect(entity.chapters.first.id, equals('chapter-1'));

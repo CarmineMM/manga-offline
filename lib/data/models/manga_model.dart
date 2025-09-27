@@ -15,6 +15,12 @@ class MangaModel {
   @Index(unique: true)
   late String referenceId;
 
+  /// Identifier for the source providing the manga data.
+  late String sourceId;
+
+  /// Human readable name of the source.
+  String? sourceName;
+
   /// Display title for the manga.
   late String title;
 
@@ -50,6 +56,8 @@ class MangaModel {
   Manga toEntity({List<ChapterModel> chapters = const <ChapterModel>[]}) =>
       Manga(
         id: referenceId,
+        sourceId: sourceId,
+        sourceName: sourceName,
         title: title,
         synopsis: synopsis,
         coverImageUrl: coverImageUrl,
@@ -66,6 +74,8 @@ class MangaModel {
   static MangaModel fromEntity(Manga manga) {
     final model = MangaModel()
       ..referenceId = manga.id
+      ..sourceId = manga.sourceId
+      ..sourceName = manga.sourceName
       ..title = manga.title
       ..synopsis = manga.synopsis
       ..coverImageUrl = manga.coverImageUrl

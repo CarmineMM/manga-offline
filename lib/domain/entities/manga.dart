@@ -6,6 +6,12 @@ class Manga {
   /// Unique identifier across sources. May map to a slug or internal UUID.
   final String id;
 
+  /// Identifier of the source responsible for providing the manga data.
+  final String sourceId;
+
+  /// Human readable name of the source.
+  final String? sourceName;
+
   /// Display title for the manga.
   final String title;
 
@@ -39,6 +45,8 @@ class Manga {
   /// Creates a new immutable [Manga] entity instance.
   const Manga({
     required this.id,
+    required this.sourceId,
+    this.sourceName,
     required this.title,
     this.synopsis,
     this.coverImageUrl,
@@ -54,6 +62,8 @@ class Manga {
   /// Convenience copy method to derive new variations while keeping immutability.
   Manga copyWith({
     String? id,
+    String? sourceId,
+    String? sourceName,
     String? title,
     String? synopsis,
     String? coverImageUrl,
@@ -67,6 +77,8 @@ class Manga {
   }) {
     return Manga(
       id: id ?? this.id,
+      sourceId: sourceId ?? this.sourceId,
+      sourceName: sourceName ?? this.sourceName,
       title: title ?? this.title,
       synopsis: synopsis ?? this.synopsis,
       coverImageUrl: coverImageUrl ?? this.coverImageUrl,

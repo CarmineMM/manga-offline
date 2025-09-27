@@ -9,6 +9,12 @@ class Chapter {
   /// Identifier of the manga this chapter belongs to.
   final String mangaId;
 
+  /// Identifier of the source responsible for the content.
+  final String sourceId;
+
+  /// Optional human readable name of the source.
+  final String? sourceName;
+
   /// Display title of the chapter.
   final String title;
 
@@ -46,6 +52,8 @@ class Chapter {
   const Chapter({
     required this.id,
     required this.mangaId,
+    required this.sourceId,
+    this.sourceName,
     required this.title,
     required this.number,
     this.remoteUrl,
@@ -63,6 +71,8 @@ class Chapter {
   Chapter copyWith({
     String? id,
     String? mangaId,
+    String? sourceId,
+    String? sourceName,
     String? title,
     int? number,
     String? remoteUrl,
@@ -78,6 +88,8 @@ class Chapter {
     return Chapter(
       id: id ?? this.id,
       mangaId: mangaId ?? this.mangaId,
+      sourceId: sourceId ?? this.sourceId,
+      sourceName: sourceName ?? this.sourceName,
       title: title ?? this.title,
       number: number ?? this.number,
       remoteUrl: remoteUrl ?? this.remoteUrl,

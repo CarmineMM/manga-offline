@@ -18,6 +18,12 @@ class ChapterModel {
   /// Reference to the parent manga.
   late String mangaReferenceId;
 
+  /// Identifier for the source that provided the chapter.
+  late String sourceId;
+
+  /// Optional source name snapshot for display.
+  String? sourceName;
+
   /// Title of the chapter.
   String? title;
 
@@ -51,6 +57,8 @@ class ChapterModel {
     return Chapter(
       id: referenceId,
       mangaId: mangaReferenceId,
+      sourceId: sourceId,
+      sourceName: sourceName,
       title: title ?? 'Capítulo $number',
       number: number,
       remoteUrl: remoteUrl,
@@ -70,6 +78,8 @@ class ChapterModel {
     final model = ChapterModel()
       ..referenceId = chapter.id
       ..mangaReferenceId = chapter.mangaId
+      ..sourceId = chapter.sourceId
+      ..sourceName = chapter.sourceName
       ..title = chapter.title
       ..number = chapter.number
       ..remoteUrl = chapter.remoteUrl
