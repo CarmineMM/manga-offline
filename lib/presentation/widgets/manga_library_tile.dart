@@ -15,6 +15,9 @@ class MangaLibraryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Debug marker to verify this build method is executed in the device logs.
+    // Remove after debugging.
+    debugPrint('MANGA_LIBRARY_TILE: build() v2');
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final progress = _computeProgress();
@@ -101,12 +104,17 @@ class MangaLibraryTile extends StatelessWidget {
 class _CoverThumbnail extends StatelessWidget {
   const _CoverThumbnail({this.imageUrl});
 
+  static const double _coverAspectRatio = 3 / 4;
   static const double _coverWidth = 96;
+  static const double _coverHeight = _coverWidth / _coverAspectRatio;
 
   final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
+    // Debug marker to verify thumbnail build on device.
+    // Remove after debugging.
+    debugPrint('COVER_THUMBNAIL: build() v2 imageUrl=${imageUrl ?? '<null>'}');
     final theme = Theme.of(context);
 
     Widget child;
@@ -127,18 +135,18 @@ class _CoverThumbnail extends StatelessWidget {
       child = _PlaceholderIcon(theme: theme);
     }
 
-    return SizedBox(
-      width: _coverWidth,
-      child: AspectRatio(
-        aspectRatio: 3 / 4,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-            ),
-            child: child,
+    return ConstrainedBox(
+      constraints: const BoxConstraints.tightFor(
+        width: _coverWidth,
+        height: _coverHeight,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
           ),
+          child: child,
         ),
       ),
     );
