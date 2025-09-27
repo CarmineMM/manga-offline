@@ -15,6 +15,7 @@ class OfflineReaderScreen extends StatefulWidget {
     required this.chapterId,
     required this.chapterTitle,
     this.initialPage = 0,
+    this.onProgress,
   });
 
   final String sourceId;
@@ -22,6 +23,7 @@ class OfflineReaderScreen extends StatefulWidget {
   final String chapterId;
   final String chapterTitle;
   final int initialPage;
+  final void Function(int pageIndex)? onProgress;
 
   @override
   State<OfflineReaderScreen> createState() => _OfflineReaderScreenState();
@@ -34,6 +36,7 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
   List<String> _paths = <String>[];
   bool _loading = true;
   bool _verticalMode = true;
+  int _currentPage = 0;
 
   @override
   void initState() {
@@ -41,6 +44,7 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
     _controller = PageController(initialPage: widget.initialPage);
     _verticalMode = _readerPrefs.mode == ReaderMode.vertical;
     _load();
+    _currentPage = widget.initialPage;
   }
 
   Future<void> _load() async {
@@ -95,22 +99,13 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
                 textAlign: TextAlign.center,
               ),
             )
-          : _verticalMode
-          ? ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              itemCount: _paths.length,
-              itemBuilder: (context, index) {
-                final path = _paths[index];
-                return Padding(
-                  padding: EdgeInsets.only(
-                    bottom: index == _paths.length - 1 ? 0 : 12,
-                  ),
-                  child: _PageImageView(path: path),
-                );
-              },
-            )
           : PageView.builder(
+              scrollDirection: _verticalMode ? Axis.vertical : Axis.horizontal,
               controller: _controller,
+              onPageChanged: (index) {
+                _currentPage = index;
+                widget.onProgress?.call(index);
+              },
               itemCount: _paths.length,
               itemBuilder: (context, index) {
                 final path = _paths[index];
@@ -122,6 +117,7 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
 
   @override
   void dispose() {
+    widget.onProgress?.call(_currentPage);
     _controller.dispose();
     super.dispose();
   }

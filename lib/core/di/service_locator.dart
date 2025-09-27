@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:manga_offline/data/datasources/cache/page_cache_datasource.dart';
+import 'package:manga_offline/data/datasources/cache/reading_progress_datasource.dart';
 import 'package:manga_offline/core/utils/reader_preferences.dart';
 import 'package:manga_offline/core/utils/source_preferences.dart';
 
@@ -48,7 +49,7 @@ Future<void> configureDependencies() async {
   late final Isar isar;
   try {
     isar = await Isar.open(
-      [PageEntitySchema],
+      [PageEntitySchema, ReadingProgressEntitySchema],
       directory: appDir.path,
       inspector: false,
     );
@@ -57,6 +58,7 @@ Future<void> configureDependencies() async {
     rethrow;
   }
   final pageCache = IsarPageCacheDataSource(isar);
+  final readingProgressDs = ReadingProgressDataSource(isar);
 
   final inMemoryMangaRepository = InMemoryMangaRepository();
   final olympusRemote = OlympusRemoteDataSource();
@@ -85,6 +87,7 @@ Future<void> configureDependencies() async {
     ..registerSingleton<SourceRepository>(inMemorySourceRepository)
     ..registerSingleton<DownloadRepository>(downloadRepository)
     ..registerSingleton<PageCacheDataSource>(pageCache)
+    ..registerSingleton<ReadingProgressDataSource>(readingProgressDs)
     ..registerSingleton<ReaderPreferences>(readerPrefs)
     ..registerSingleton<SourcePreferences>(sourcePrefs)
     ..registerLazySingleton(() => WatchDownloadedMangas(serviceLocator()))
@@ -103,6 +106,7 @@ Future<void> configureDependencies() async {
         fetchMangaDetail: serviceLocator(),
         watchDownloadedMangas: serviceLocator(),
         queueChapterDownload: serviceLocator(),
+        readingProgressDataSource: serviceLocator(),
       ),
     )
     ..registerFactory(

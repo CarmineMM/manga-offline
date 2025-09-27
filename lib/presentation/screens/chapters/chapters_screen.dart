@@ -9,6 +9,7 @@ import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/presentation/blocs/manga_detail/manga_detail_cubit.dart';
 import 'package:manga_offline/presentation/widgets/chapter_list_tile.dart';
 import 'package:manga_offline/presentation/screens/reader/offline_reader_screen.dart';
+import 'package:manga_offline/presentation/screens/reader/online_reader_screen.dart';
 
 /// Displays the list of chapters for a given manga.
 class ChapterListScreen extends StatelessWidget {
@@ -128,9 +129,23 @@ class _ChapterListBody extends StatelessWidget {
                 );
               },
               onReadOnline: (Chapter selected) {
-                _showMessage(
-                  context,
-                  'La lectura en línea estará disponible próximamente.',
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => OnlineReaderScreen(
+                      sourceId: selected.sourceId,
+                      mangaId: selected.mangaId,
+                      chapterId: selected.id,
+                      chapterTitle: selected.title,
+                      initialPage: (selected.lastReadPage ?? 1) - 1,
+                      onProgress: (pageIdx) =>
+                          detailCubit.updateChapterProgress(
+                            chapterId: selected.id,
+                            pageNumber: pageIdx,
+                          ),
+                      onDownloadChapter: () =>
+                          unawaited(detailCubit.downloadChapter(selected)),
+                    ),
+                  ),
                 );
               },
               onReadOffline: (Chapter selected) {
@@ -143,6 +158,11 @@ class _ChapterListBody extends StatelessWidget {
                         chapterId: selected.id,
                         chapterTitle: selected.title,
                         initialPage: (selected.lastReadPage ?? 1) - 1,
+                        onProgress: (pageIdx) =>
+                            detailCubit.updateChapterProgress(
+                              chapterId: selected.id,
+                              pageNumber: pageIdx,
+                            ),
                       ),
                     ),
                   );
