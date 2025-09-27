@@ -3,6 +3,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:manga_offline/data/datasources/manga_local_datasource.dart';
 import 'package:manga_offline/data/models/chapter_model.dart';
 import 'package:manga_offline/data/models/manga_model.dart';
+import 'package:manga_offline/data/models/page_image_model.dart';
 import 'package:manga_offline/data/repositories/manga_repository_impl.dart';
 import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
@@ -23,11 +24,15 @@ void main() {
         ..status = DownloadStatus.notDownloaded,
     );
     registerFallbackValue(<ChapterModel>[]);
+    registerFallbackValue(<PageImageModel>[]);
   });
 
   setUp(() {
     local = _MockMangaLocalDataSource();
     repository = MangaRepositoryImpl(localDataSource: local);
+    when(
+      () => local.getPagesForChapter(any()),
+    ).thenAnswer((_) async => const <PageImageModel>[]);
   });
 
   test('watchLocalLibrary emits mangas with their chapters', () async {
@@ -50,6 +55,9 @@ void main() {
     when(
       () => local.getChaptersForManga('manga-1'),
     ).thenAnswer((_) async => [chapterModel]);
+    when(
+      () => local.getPagesForChapter('chapter-1'),
+    ).thenAnswer((_) async => const <PageImageModel>[]);
 
     await expectLater(
       repository.watchLocalLibrary(),
@@ -81,6 +89,7 @@ void main() {
       () => local.putManga(
         any(),
         chapters: any(named: 'chapters'),
+        pages: any(named: 'pages'),
         replaceChapters: any(named: 'replaceChapters'),
       ),
     ).thenAnswer((_) async {});
@@ -91,6 +100,7 @@ void main() {
       () => local.putManga(
         captureAny(),
         chapters: captureAny(named: 'chapters'),
+        pages: captureAny(named: 'pages'),
         replaceChapters: captureAny(named: 'replaceChapters'),
       ),
     ).captured;
@@ -98,11 +108,14 @@ void main() {
     final MangaModel stored = captured[0] as MangaModel;
     final List<ChapterModel> storedChapters = (captured[1] as List<dynamic>)
         .cast<ChapterModel>();
-    final bool replaceChapters = captured[2] as bool;
+    final List<PageImageModel> storedPages = (captured[2] as List<dynamic>)
+        .cast<PageImageModel>();
+    final bool replaceChapters = captured[3] as bool;
 
     expect(stored.referenceId, equals('manga-1'));
     expect(storedChapters, hasLength(1));
     expect(storedChapters.first.referenceId, equals('chapter-1'));
+    expect(storedPages, isEmpty);
     expect(replaceChapters, isTrue);
   });
 

@@ -5,10 +5,25 @@ import 'package:manga_offline/domain/entities/download_status.dart';
 /// Visual tile for presenting a chapter and its download status.
 class ChapterListTile extends StatelessWidget {
   /// Creates a new [ChapterListTile].
-  const ChapterListTile({super.key, required this.chapter});
+  const ChapterListTile({
+    super.key,
+    required this.chapter,
+    this.onDownload,
+    this.onReadOnline,
+    this.onReadOffline,
+  });
 
   /// Chapter information rendered by the tile.
   final Chapter chapter;
+
+  /// Callback triggered when the user requests a download.
+  final void Function(Chapter chapter)? onDownload;
+
+  /// Callback triggered when the user wants to read online.
+  final void Function(Chapter chapter)? onReadOnline;
+
+  /// Callback triggered when the user wants to read offline.
+  final void Function(Chapter chapter)? onReadOffline;
 
   @override
   Widget build(BuildContext context) {
@@ -75,6 +90,15 @@ class ChapterListTile extends StatelessWidget {
                   ],
                 ),
               ),
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: _ChapterActions(
+                chapter: chapter,
+                onDownload: onDownload,
+                onReadOnline: onReadOnline,
+                onReadOffline: onReadOffline,
+              ),
+            ),
           ],
         ),
       ),
@@ -111,5 +135,97 @@ class _StatusLabel extends StatelessWidget {
       case DownloadStatus.failed:
         return ('Error al descargar', colors.error);
     }
+  }
+}
+
+class _ChapterActions extends StatelessWidget {
+  const _ChapterActions({
+    required this.chapter,
+    this.onDownload,
+    this.onReadOnline,
+    this.onReadOffline,
+  });
+
+  final Chapter chapter;
+  final void Function(Chapter chapter)? onDownload;
+  final void Function(Chapter chapter)? onReadOnline;
+  final void Function(Chapter chapter)? onReadOffline;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (chapter.status) {
+      case DownloadStatus.notDownloaded:
+      case DownloadStatus.failed:
+        return _buildPendingActions(
+          context,
+          isRetry: chapter.status == DownloadStatus.failed,
+        );
+      case DownloadStatus.queued:
+        return Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton.tonal(
+            onPressed: null,
+            child: const Text('En cola'),
+          ),
+        );
+      case DownloadStatus.downloading:
+        return Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton.tonal(
+            onPressed: null,
+            child: const Text('Descargando...'),
+          ),
+        );
+      case DownloadStatus.downloaded:
+        return Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton(
+            onPressed: onReadOffline != null
+                ? () => onReadOffline!(chapter)
+                : () => _showPendingMessage(
+                    context,
+                    'Muy pronto podrás leer el capítulo offline desde aquí.',
+                  ),
+            child: const Text('Leer offline'),
+          ),
+        );
+    }
+  }
+
+  Widget _buildPendingActions(BuildContext context, {required bool isRetry}) {
+    final canReadOnline = chapter.remoteUrl?.isNotEmpty == true;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: <Widget>[
+        TextButton(
+          onPressed: canReadOnline
+              ? (onReadOnline != null
+                    ? () => onReadOnline!(chapter)
+                    : () => _showPendingMessage(
+                        context,
+                        'Abriremos la lectura en línea en una versión futura.',
+                      ))
+              : null,
+          child: const Text('Leer en línea'),
+        ),
+        const SizedBox(width: 8),
+        FilledButton(
+          onPressed: onDownload != null
+              ? () => onDownload!(chapter)
+              : () => _showPendingMessage(
+                  context,
+                  'Estamos preparando el gestor de descargas.',
+                ),
+          child: Text(isRetry ? 'Reintentar descarga' : 'Descargar'),
+        ),
+      ],
+    );
+  }
+
+  void _showPendingMessage(BuildContext context, String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }

@@ -4,6 +4,7 @@ import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
 import 'package:manga_offline/domain/entities/manga_source.dart';
+import 'package:manga_offline/domain/entities/page_image.dart';
 import 'package:manga_offline/domain/entities/source_capability.dart';
 import 'package:manga_offline/domain/repositories/catalog_repository.dart';
 import 'package:manga_offline/domain/repositories/manga_repository.dart';
@@ -31,6 +32,73 @@ class InMemoryMangaRepository implements MangaRepository {
   Future<void> saveManga(Manga manga) async {
     _mangas[manga.id] = manga;
     _emit();
+  }
+
+  @override
+  Future<void> saveChapter(Chapter chapter) async {
+    final existing = _mangas[chapter.mangaId];
+    if (existing == null) {
+      final downloadedCount = chapter.status == DownloadStatus.downloaded
+          ? 1
+          : 0;
+      _mangas[chapter.mangaId] = Manga(
+        id: chapter.mangaId,
+        sourceId: chapter.sourceId,
+        title: chapter.mangaId,
+        status: downloadedCount > 0
+            ? DownloadStatus.downloaded
+            : DownloadStatus.notDownloaded,
+        totalChapters: 1,
+        downloadedChapters: downloadedCount,
+        chapters: [chapter],
+      );
+      _emit();
+      return;
+    }
+
+    final chapters = existing.chapters.toList(growable: true);
+    final index = chapters.indexWhere((item) => item.id == chapter.id);
+    if (index >= 0) {
+      chapters[index] = chapter;
+    } else {
+      chapters.add(chapter);
+    }
+
+    final downloadedCount = chapters
+        .where((element) => element.status == DownloadStatus.downloaded)
+        .length;
+
+    final totalChapters = existing.totalChapters == 0
+        ? chapters.length
+        : existing.totalChapters;
+
+    var status = DownloadStatus.notDownloaded;
+    if (downloadedCount >= totalChapters && totalChapters > 0) {
+      status = DownloadStatus.downloaded;
+    } else if (downloadedCount > 0) {
+      status = DownloadStatus.downloading;
+    }
+
+    _mangas[existing.id] = existing.copyWith(
+      chapters: chapters,
+      downloadedChapters: downloadedCount,
+      status: status,
+      totalChapters: totalChapters,
+    );
+    _emit();
+  }
+
+  @override
+  Future<Chapter?> getChapter(String chapterId) async {
+    for (final manga in _mangas.values) {
+      final index = manga.chapters.indexWhere(
+        (chapter) => chapter.id == chapterId,
+      );
+      if (index != -1) {
+        return manga.chapters[index];
+      }
+    }
+    return null;
   }
 
   @override
@@ -124,6 +192,8 @@ class InMemoryCatalogRepository implements CatalogRepository {
   final InMemoryMangaRepository _mangaRepository;
   final Map<String, List<Manga>> _catalogBySource = <String, List<Manga>>{};
   final Map<String, List<Chapter>> _chaptersByManga = <String, List<Chapter>>{};
+  final Map<String, List<PageImage>> _pagesByChapter =
+      <String, List<PageImage>>{};
 
   @override
   Future<void> syncCatalog({required String sourceId}) async {
@@ -180,6 +250,30 @@ class InMemoryCatalogRepository implements CatalogRepository {
         status: DownloadStatus.notDownloaded,
       );
     });
+  }
+
+  @override
+  Future<List<PageImage>> fetchChapterPages({
+    required String sourceId,
+    required String mangaId,
+    required String chapterId,
+  }) async {
+    final existing = _pagesByChapter[chapterId];
+    if (existing != null) {
+      return existing;
+    }
+
+    final pages = List<PageImage>.generate(15, (index) {
+      final number = index + 1;
+      return PageImage(
+        id: '$chapterId-$number',
+        chapterId: chapterId,
+        pageNumber: number,
+        remoteUrl: 'https://example.com/$chapterId/$number.jpg',
+      );
+    });
+    _pagesByChapter[chapterId] = pages;
+    return pages;
   }
 }
 

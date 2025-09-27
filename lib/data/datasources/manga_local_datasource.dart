@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:isar/isar.dart';
 import 'package:manga_offline/data/models/chapter_model.dart';
 import 'package:manga_offline/data/models/manga_model.dart';
+import 'package:manga_offline/data/models/page_image_model.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
 
 /// Local data source responsible for persisting mangas in Isar.
@@ -19,11 +20,15 @@ class MangaLocalDataSource {
   IsarCollection<ChapterModel> get _chapterCollection =>
       isar.collection<ChapterModel>();
 
+  IsarCollection<PageImageModel> get _pageCollection =>
+      isar.collection<PageImageModel>();
+
   /// Persists manga metadata in the local database, optionally replacing
   /// associated chapters in a single transaction.
   Future<void> putManga(
     MangaModel model, {
     List<ChapterModel> chapters = const <ChapterModel>[],
+    List<PageImageModel> pages = const <PageImageModel>[],
     bool replaceChapters = false,
   }) async {
     model.id ??= _hashString(model.referenceId);
@@ -31,8 +36,19 @@ class MangaLocalDataSource {
       chapter.id ??= _chapterId(chapter.referenceId, chapter.sourceId);
     }
 
+    for (final page in pages) {
+      page.id ??= _pageId(page.referenceId);
+    }
+
+    final existingChapters = replaceChapters
+        ? await getChaptersForManga(model.referenceId)
+        : const <ChapterModel>[];
+
     await isar.writeTxn(() async {
       if (replaceChapters) {
+        for (final chapter in existingChapters) {
+          await _deletePagesForChapter(chapter.referenceId);
+        }
         await _deleteChaptersForManga(model.referenceId);
       }
 
@@ -40,6 +56,10 @@ class MangaLocalDataSource {
 
       if (chapters.isNotEmpty) {
         await _chapterCollection.putAll(chapters);
+      }
+
+      if (pages.isNotEmpty) {
+        await _pageCollection.putAll(pages);
       }
     });
   }
@@ -95,6 +115,37 @@ class MangaLocalDataSource {
     return query.findAll();
   }
 
+  /// Retrieves the page images associated with a chapter.
+  Future<List<PageImageModel>> getPagesForChapter(String chapterReferenceId) {
+    final query = _pageCollection.buildQuery<PageImageModel>(
+      filter: FilterCondition.equalTo(
+        property: r'chapterReferenceId',
+        value: chapterReferenceId,
+      ),
+    );
+    return query.findAll();
+  }
+
+  /// Persists a single chapter and its related pages.
+  Future<void> putChapter(
+    ChapterModel model, {
+    List<PageImageModel> pages = const <PageImageModel>[],
+  }) async {
+    model.id ??= _chapterId(model.referenceId, model.sourceId);
+    for (final page in pages) {
+      page.id ??= _pageId(page.referenceId);
+    }
+
+    await isar.writeTxn(() async {
+      await _chapterCollection.put(model);
+      if (pages.isNotEmpty) {
+        await _deletePagesForChapter(model.referenceId);
+        await _pageCollection.putAll(pages);
+      }
+      await _refreshMangaDownloadCounters(model.mangaReferenceId);
+    });
+  }
+
   /// Watches the collection for changes and emits the current list of mangas.
   Stream<List<MangaModel>> watchMangas() {
     late StreamSubscription<void> subscription;
@@ -138,6 +189,14 @@ class MangaLocalDataSource {
           if (chapter.totalPages > 0) {
             chapter.downloadedPages = chapter.totalPages;
           }
+          final pages = await getPagesForChapter(chapter.referenceId);
+          if (pages.isNotEmpty) {
+            for (final page in pages) {
+              page.status = DownloadStatus.downloaded;
+              page.downloadedAt ??= timestamp;
+            }
+            await _pageCollection.putAll(pages);
+          }
         }
         await _chapterCollection.putAll(chapters);
       }
@@ -165,6 +224,15 @@ class MangaLocalDataSource {
         chapter.downloadedPages = chapter.totalPages;
       }
       await _chapterCollection.put(chapter);
+
+      final pages = await getPagesForChapter(chapter.referenceId);
+      if (pages.isNotEmpty) {
+        for (final page in pages) {
+          page.status = DownloadStatus.downloaded;
+          page.downloadedAt ??= timestamp;
+        }
+        await _pageCollection.putAll(pages);
+      }
 
       final manga = await getManga(chapter.mangaReferenceId);
       if (manga == null) {
@@ -210,9 +278,46 @@ class MangaLocalDataSource {
     await query.deleteAll();
   }
 
+  Future<void> _deletePagesForChapter(String chapterReferenceId) async {
+    final query = _pageCollection.buildQuery<PageImageModel>(
+      filter: FilterCondition.equalTo(
+        property: r'chapterReferenceId',
+        value: chapterReferenceId,
+      ),
+    );
+    await query.deleteAll();
+  }
+
+  Future<void> _refreshMangaDownloadCounters(String mangaReferenceId) async {
+    final manga = await getManga(mangaReferenceId);
+    if (manga == null) {
+      return;
+    }
+
+    final chapters = await getChaptersForManga(mangaReferenceId);
+    final downloadedChapters = chapters
+        .where((chapter) => chapter.status == DownloadStatus.downloaded)
+        .length;
+
+    if (downloadedChapters == 0) {
+      manga.status = DownloadStatus.notDownloaded;
+    } else if (manga.totalChapters > 0 &&
+        downloadedChapters >= manga.totalChapters) {
+      manga.status = DownloadStatus.downloaded;
+    } else {
+      manga.status = DownloadStatus.downloading;
+    }
+
+    manga.downloadedChapters = downloadedChapters;
+    manga.lastUpdated = DateTime.now();
+    await _mangaCollection.put(manga);
+  }
+
   int _chapterId(String referenceId, String sourceId) {
     return _hashString('$sourceId::$referenceId');
   }
+
+  int _pageId(String referenceId) => _hashString('page::$referenceId');
 
   int _hashString(String value) => value.hashCode & 0x7fffffffffffffff;
 }

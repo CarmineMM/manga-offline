@@ -1,20 +1,45 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manga_offline/data/stubs/in_memory_repositories.dart';
+import 'package:manga_offline/domain/entities/chapter.dart';
+import 'package:manga_offline/domain/entities/download_task.dart';
+import 'package:manga_offline/domain/entities/manga.dart';
+import 'package:manga_offline/domain/repositories/download_repository.dart';
 import 'package:manga_offline/domain/usecases/fetch_manga_detail.dart';
+import 'package:manga_offline/domain/usecases/queue_chapter_download.dart';
+import 'package:manga_offline/domain/usecases/watch_downloaded_mangas.dart';
 import 'package:manga_offline/presentation/blocs/manga_detail/manga_detail_cubit.dart';
+
+class _FakeDownloadRepository implements DownloadRepository {
+  @override
+  Future<void> enqueueChapterDownload(Chapter chapter) async {}
+
+  @override
+  Future<void> enqueueMangaDownload(Manga manga) async {}
+
+  @override
+  Stream<List<DownloadTask>> watchDownloadQueue() => const Stream.empty();
+}
 
 void main() {
   group('MangaDetailCubit', () {
     late InMemoryMangaRepository mangaRepository;
     late InMemoryCatalogRepository catalogRepository;
     late FetchMangaDetail fetchMangaDetail;
+    late WatchDownloadedMangas watchDownloadedMangas;
+    late QueueChapterDownload queueChapterDownload;
     late MangaDetailCubit cubit;
 
     setUp(() {
       mangaRepository = InMemoryMangaRepository();
       catalogRepository = InMemoryCatalogRepository(mangaRepository);
       fetchMangaDetail = FetchMangaDetail(catalogRepository);
-      cubit = MangaDetailCubit(fetchMangaDetail);
+      watchDownloadedMangas = WatchDownloadedMangas(mangaRepository);
+      queueChapterDownload = QueueChapterDownload(_FakeDownloadRepository());
+      cubit = MangaDetailCubit(
+        fetchMangaDetail: fetchMangaDetail,
+        watchDownloadedMangas: watchDownloadedMangas,
+        queueChapterDownload: queueChapterDownload,
+      );
     });
 
     tearDown(() async {

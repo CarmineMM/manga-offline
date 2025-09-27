@@ -6,6 +6,7 @@ import 'package:manga_offline/domain/entities/download_task.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
 import 'package:manga_offline/domain/entities/manga_source.dart';
+import 'package:manga_offline/domain/entities/page_image.dart';
 import 'package:manga_offline/domain/entities/source_capability.dart';
 import 'package:manga_offline/domain/repositories/catalog_repository.dart';
 import 'package:manga_offline/domain/repositories/download_repository.dart';
@@ -56,6 +57,7 @@ class _FakeCatalogRepository implements CatalogRepository {
   String? lastDetailManga;
   List<Manga> catalog = const [];
   Manga? detail;
+  List<PageImage> pages = const [];
 
   @override
   Future<List<Manga>> fetchCatalog({required String sourceId}) async {
@@ -76,6 +78,15 @@ class _FakeCatalogRepository implements CatalogRepository {
   @override
   Future<void> syncCatalog({required String sourceId}) async {
     lastSyncedSource = sourceId;
+  }
+
+  @override
+  Future<List<PageImage>> fetchChapterPages({
+    required String sourceId,
+    required String mangaId,
+    required String chapterId,
+  }) async {
+    return pages;
   }
 }
 
@@ -126,7 +137,52 @@ class _FakeMangaRepository implements MangaRepository {
   @override
   Future<void> saveManga(Manga manga) async {
     _stored[manga.id] = manga;
+    _mangaStatuses[manga.id] = manga.status;
     _controller.add(_stored.values.toList());
+  }
+
+  @override
+  Future<void> saveChapter(Chapter chapter) async {
+    final existing = _stored[chapter.mangaId];
+    if (existing == null) {
+      _stored[chapter.mangaId] = Manga(
+        id: chapter.mangaId,
+        sourceId: chapter.sourceId,
+        title: chapter.mangaId,
+        chapters: [chapter],
+        totalChapters: 1,
+        downloadedChapters: chapter.status == DownloadStatus.downloaded ? 1 : 0,
+      );
+    } else {
+      final chapters = existing.chapters.toList();
+      final index = chapters.indexWhere((c) => c.id == chapter.id);
+      if (index >= 0) {
+        chapters[index] = chapter;
+      } else {
+        chapters.add(chapter);
+      }
+      final downloadedCount = chapters
+          .where((c) => c.status == DownloadStatus.downloaded)
+          .length;
+      _stored[existing.id] = existing.copyWith(
+        chapters: chapters,
+        downloadedChapters: downloadedCount,
+      );
+    }
+
+    _chapterStatuses[chapter.id] = chapter.status;
+    _controller.add(_stored.values.toList());
+  }
+
+  @override
+  Future<Chapter?> getChapter(String chapterId) async {
+    for (final manga in _stored.values) {
+      final index = manga.chapters.indexWhere((c) => c.id == chapterId);
+      if (index != -1) {
+        return manga.chapters[index];
+      }
+    }
+    return null;
   }
 
   @override

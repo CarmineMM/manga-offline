@@ -1,3 +1,4 @@
+import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
 
@@ -8,6 +9,13 @@ abstract interface class MangaRepository {
 
   /// Persists downloaded manga metadata locally.
   Future<void> saveManga(Manga manga);
+
+  /// Persists the provided [chapter], ensuring metadata and related pages
+  /// stay in sync with the parent manga record.
+  Future<void> saveChapter(Chapter chapter);
+
+  /// Retrieves a chapter by its [chapterId], if stored locally.
+  Future<Chapter?> getChapter(String chapterId);
 
   /// Updates the download status of the given manga to [DownloadStatus.downloaded].
   Future<void> markMangaAsDownloaded(String mangaId);

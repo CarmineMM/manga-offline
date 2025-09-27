@@ -68,6 +68,40 @@ class OlympusRemoteDataSource implements CatalogRemoteDataSource {
     return chapters;
   }
 
+  @override
+  Future<List<RemotePageImage>> fetchChapterPages({
+    required String mangaSlug,
+    required String chapterId,
+  }) async {
+    final uri = Uri(
+      scheme: _baseChaptersUri.scheme,
+      host: _baseChaptersUri.host,
+      port: _baseChaptersUri.hasPort ? _baseChaptersUri.port : null,
+      path: '${_baseChaptersUri.path}/$mangaSlug/chapters/$chapterId',
+    );
+
+    final response = await _httpClient.get(uri);
+    if (response.statusCode != 200) {
+      throw http.ClientException(
+        'Failed to fetch Olympus chapter $chapterId for $mangaSlug (status ${response.statusCode})',
+        uri,
+      );
+    }
+
+    final jsonPayload = jsonDecode(response.body) as Map<String, dynamic>;
+    final pagesPayload = _extractPagesPayload(jsonPayload);
+
+    final result = <RemotePageImage>[];
+    for (final entry in pagesPayload) {
+      final mapped = _mapPageImage(chapterId, entry);
+      if (mapped != null) {
+        result.add(mapped);
+      }
+    }
+
+    return result;
+  }
+
   /// Releases resources associated with the underlying HTTP client.
   void dispose() {
     _httpClient.close();
@@ -184,6 +218,72 @@ class OlympusRemoteDataSource implements CatalogRemoteDataSource {
       sourceName: sourceName,
       publishedAt: publishedAt,
     );
+  }
+
+  Iterable<Map<String, dynamic>> _extractPagesPayload(
+    Map<String, dynamic> json,
+  ) {
+    final Map<String, dynamic> candidates = <String, dynamic>{
+      ...json,
+      if (json['data'] is Map<String, dynamic>)
+        ...(json['data'] as Map<String, dynamic>),
+    };
+
+    for (final key in ['pages', 'images', 'data']) {
+      final value = candidates[key];
+      if (value is List) {
+        return value.whereType<Map<String, dynamic>>();
+      }
+    }
+
+    return const Iterable<Map<String, dynamic>>.empty();
+  }
+
+  RemotePageImage? _mapPageImage(String chapterId, Map<String, dynamic> json) {
+    final rawId = json['id'] ?? json['uuid'] ?? json['key'];
+    final rawNumber =
+        json['page'] ?? json['number'] ?? json['order'] ?? json['index'];
+    final number = (rawNumber as num?)?.toInt() ?? 0;
+
+    final rawUrl =
+        json['image'] ??
+        json['url'] ??
+        json['imageUrl'] ??
+        json['image_url'] ??
+        json['full_path'] ??
+        json['path'];
+
+    if (rawUrl == null || (rawUrl is String && rawUrl.isEmpty)) {
+      return null;
+    }
+
+    final imageUrl = _resolveImageUrl(rawUrl.toString());
+    final externalId = (rawId ?? '${chapterId}_$number').toString();
+
+    return RemotePageImage(
+      externalId: externalId,
+      chapterId: chapterId,
+      pageNumber: number <= 0 ? 1 : number,
+      imageUrl: imageUrl,
+      checksum: json['checksum'] as String?,
+    );
+  }
+
+  String _resolveImageUrl(String url) {
+    final parsed = Uri.tryParse(url);
+    if (parsed == null) {
+      return url;
+    }
+    if (parsed.hasScheme) {
+      return url;
+    }
+
+    return Uri(
+      scheme: _baseChaptersUri.scheme,
+      host: _baseChaptersUri.host,
+      port: _baseChaptersUri.hasPort ? _baseChaptersUri.port : null,
+      path: url.startsWith('/') ? url : '${_baseChaptersUri.path}/$url',
+    ).toString();
   }
 }
 

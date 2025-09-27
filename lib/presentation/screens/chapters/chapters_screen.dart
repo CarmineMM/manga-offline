@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:manga_offline/core/di/service_locator.dart';
@@ -109,15 +111,43 @@ class _ChapterListBody extends StatelessWidget {
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate((BuildContext context, int index) {
           final chapter = chapters[index];
+          final detailCubit = context.read<MangaDetailCubit>();
           return Padding(
             padding: EdgeInsets.only(
               bottom: index == chapters.length - 1 ? 0 : 12,
             ),
-            child: ChapterListTile(chapter: chapter),
+            child: ChapterListTile(
+              chapter: chapter,
+              onDownload: (Chapter selected) {
+                unawaited(detailCubit.downloadChapter(selected));
+                _showMessage(
+                  context,
+                  'Capítulo agregado a la cola de descargas.',
+                );
+              },
+              onReadOnline: (Chapter selected) {
+                _showMessage(
+                  context,
+                  'La lectura en línea estará disponible próximamente.',
+                );
+              },
+              onReadOffline: (Chapter selected) {
+                _showMessage(
+                  context,
+                  'Preparando el lector offline para ${selected.title}.',
+                );
+              },
+            ),
           );
         }, childCount: chapters.length),
       ),
     );
+  }
+
+  void _showMessage(BuildContext context, String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

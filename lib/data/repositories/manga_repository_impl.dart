@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:manga_offline/data/datasources/manga_local_datasource.dart';
 import 'package:manga_offline/data/models/chapter_model.dart';
 import 'package:manga_offline/data/models/manga_model.dart';
+import 'package:manga_offline/data/models/page_image_model.dart';
+import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
 import 'package:manga_offline/domain/repositories/manga_repository.dart';
@@ -20,10 +22,19 @@ class MangaRepositoryImpl implements MangaRepository {
     return _localDataSource.watchMangas().asyncMap((models) async {
       final result = <Manga>[];
       for (final model in models) {
-        final chapters = await _localDataSource.getChaptersForManga(
+        final chapterModels = await _localDataSource.getChaptersForManga(
           model.referenceId,
         );
-        result.add(model.toEntity(chapters: chapters));
+        final chapters = <Chapter>[];
+        for (final chapterModel in chapterModels) {
+          final pages = await _localDataSource.getPagesForChapter(
+            chapterModel.referenceId,
+          );
+          chapters.add(chapterModel.toEntity(pages: pages));
+        }
+
+        final entity = model.toEntity().copyWith(chapters: chapters);
+        result.add(entity);
       }
       return result;
     });
@@ -35,11 +46,36 @@ class MangaRepositoryImpl implements MangaRepository {
     final chapters = manga.chapters
         .map<ChapterModel>((chapter) => ChapterModel.fromEntity(chapter))
         .toList(growable: false);
+    final pages = manga.chapters
+        .expand<PageImageModel>(
+          (chapter) => chapter.pages.map(PageImageModel.fromEntity),
+        )
+        .toList(growable: false);
     return _localDataSource.putManga(
       model,
       chapters: chapters,
+      pages: pages,
       replaceChapters: true,
     );
+  }
+
+  @override
+  Future<void> saveChapter(Chapter chapter) {
+    final model = ChapterModel.fromEntity(chapter);
+    final pages = chapter.pages
+        .map<PageImageModel>(PageImageModel.fromEntity)
+        .toList(growable: false);
+    return _localDataSource.putChapter(model, pages: pages);
+  }
+
+  @override
+  Future<Chapter?> getChapter(String chapterId) async {
+    final model = await _localDataSource.getChapter(chapterId);
+    if (model == null) {
+      return null;
+    }
+    final pages = await _localDataSource.getPagesForChapter(chapterId);
+    return model.toEntity(pages: pages);
   }
 
   @override

@@ -4,6 +4,7 @@ import 'package:manga_offline/data/datasources/catalog_remote_datasource.dart';
 import 'package:manga_offline/data/datasources/manga_local_datasource.dart';
 import 'package:manga_offline/data/models/chapter_model.dart';
 import 'package:manga_offline/data/models/manga_model.dart';
+import 'package:manga_offline/data/models/page_image_model.dart';
 import 'package:manga_offline/data/repositories/catalog_repository_impl.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
 
@@ -26,6 +27,7 @@ void main() {
         ..status = DownloadStatus.notDownloaded,
     );
     registerFallbackValue(<ChapterModel>[]);
+    registerFallbackValue(<PageImageModel>[]);
   });
 
   setUp(() {
@@ -38,6 +40,9 @@ void main() {
     when(
       () => remote.fetchAllChapters(mangaSlug: any(named: 'mangaSlug')),
     ).thenAnswer((_) async => const <RemoteChapterSummary>[]);
+    when(
+      () => local.getPagesForChapter(any()),
+    ).thenAnswer((_) async => const <PageImageModel>[]);
     repository = CatalogRepositoryImpl(
       localDataSource: local,
       remoteDataSources: {sourceId: remote},
@@ -64,6 +69,7 @@ void main() {
         () => local.putManga(
           any(),
           chapters: any(named: 'chapters'),
+          pages: any(named: 'pages'),
           replaceChapters: any(named: 'replaceChapters'),
         ),
       ).thenAnswer((_) async {});
@@ -74,16 +80,20 @@ void main() {
         () => local.putManga(
           captureAny(),
           chapters: captureAny(named: 'chapters'),
+          pages: captureAny(named: 'pages'),
           replaceChapters: captureAny(named: 'replaceChapters'),
         ),
       ).captured;
 
       final MangaModel stored = captured[0] as MangaModel;
-      final bool replaceChapters = captured[2] as bool;
+      final List<PageImageModel> storedPages = (captured[2] as List<dynamic>)
+          .cast<PageImageModel>();
+      final bool replaceChapters = captured[3] as bool;
 
       expect(stored.referenceId, equals(summary.slug));
       expect(stored.title, equals(summary.title));
       expect(stored.totalChapters, equals(summary.chapterCount));
+      expect(storedPages, isEmpty);
       expect(replaceChapters, isFalse);
     });
   });
@@ -166,6 +176,7 @@ void main() {
         () => local.putManga(
           any(),
           chapters: any(named: 'chapters'),
+          pages: any(named: 'pages'),
           replaceChapters: any(named: 'replaceChapters'),
         ),
       ).thenAnswer((_) async {});
@@ -184,6 +195,7 @@ void main() {
         () => local.putManga(
           any(),
           chapters: any(named: 'chapters'),
+          pages: any(named: 'pages'),
           replaceChapters: true,
         ),
       ).called(1);
@@ -211,6 +223,7 @@ void main() {
         () => local.putManga(
           any(),
           chapters: any(named: 'chapters'),
+          pages: any(named: 'pages'),
           replaceChapters: any(named: 'replaceChapters'),
         ),
       ).thenAnswer((_) async {});

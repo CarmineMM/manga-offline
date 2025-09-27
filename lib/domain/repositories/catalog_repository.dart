@@ -1,4 +1,5 @@
 import 'package:manga_offline/domain/entities/manga.dart';
+import 'package:manga_offline/domain/entities/page_image.dart';
 
 /// Contract providing access to catalog data retrieved from remote sources.
 abstract interface class CatalogRepository {
@@ -12,5 +13,12 @@ abstract interface class CatalogRepository {
   Future<Manga> fetchMangaDetail({
     required String sourceId,
     required String mangaId,
+  });
+
+  /// Fetches the list of page images for a specific chapter.
+  Future<List<PageImage>> fetchChapterPages({
+    required String sourceId,
+    required String mangaId,
+    required String chapterId,
   });
 }

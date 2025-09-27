@@ -2,9 +2,11 @@ import 'package:manga_offline/data/datasources/catalog_remote_datasource.dart';
 import 'package:manga_offline/data/datasources/manga_local_datasource.dart';
 import 'package:manga_offline/data/models/chapter_model.dart';
 import 'package:manga_offline/data/models/manga_model.dart';
+import 'package:manga_offline/data/models/page_image_model.dart';
 import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
+import 'package:manga_offline/domain/entities/page_image.dart';
 import 'package:manga_offline/domain/repositories/catalog_repository.dart';
 
 /// Implementation of [CatalogRepository] combining remote sources with Isar
@@ -45,10 +47,19 @@ class CatalogRepositoryImpl implements CatalogRepository {
     final models = await _localDataSource.getMangasBySource(sourceId);
     final mangas = <Manga>[];
     for (final model in models) {
-      final chapters = await _localDataSource.getChaptersForManga(
+      final chapterModels = await _localDataSource.getChaptersForManga(
         model.referenceId,
       );
-      mangas.add(model.toEntity(chapters: chapters));
+      final chapters = <Chapter>[];
+      for (final chapterModel in chapterModels) {
+        final pages = await _localDataSource.getPagesForChapter(
+          chapterModel.referenceId,
+        );
+        chapters.add(chapterModel.toEntity(pages: pages));
+      }
+
+      final entity = model.toEntity().copyWith(chapters: chapters);
+      mangas.add(entity);
     }
     return mangas;
   }
@@ -64,14 +75,20 @@ class CatalogRepositoryImpl implements CatalogRepository {
     final existingChapterModels = await _localDataSource.getChaptersForManga(
       mangaId,
     );
-    final existingChaptersById = {
-      for (final model in existingChapterModels)
-        model.referenceId: model.toEntity(),
-    };
+    final existingChaptersById = <String, Chapter>{};
+    for (final model in existingChapterModels) {
+      final pages = await _localDataSource.getPagesForChapter(
+        model.referenceId,
+      );
+      existingChaptersById[model.referenceId] = model.toEntity(pages: pages);
+    }
 
     if (remoteChapters.isEmpty) {
       if (existingModel != null) {
-        return existingModel.toEntity(chapters: existingChapterModels);
+        final base = existingModel.toEntity();
+        return base.copyWith(
+          chapters: existingChaptersById.values.toList(growable: false),
+        );
       }
       return Manga(
         id: mangaId,
@@ -83,7 +100,9 @@ class CatalogRepositoryImpl implements CatalogRepository {
     }
 
     final baseManga = existingModel != null
-        ? existingModel.toEntity(chapters: existingChapterModels)
+        ? existingModel.toEntity().copyWith(
+            chapters: existingChaptersById.values.toList(growable: false),
+          )
         : Manga(
             id: mangaId,
             sourceId: sourceId,
@@ -129,13 +148,42 @@ class CatalogRepositoryImpl implements CatalogRepository {
     final chapterModels = chapterEntities
         .map((chapter) => ChapterModel.fromEntity(chapter))
         .toList(growable: false);
+    final pageModels = chapterEntities
+        .expand<PageImageModel>(
+          (chapter) => chapter.pages.map(PageImageModel.fromEntity),
+        )
+        .toList(growable: false);
 
     await _localDataSource.putManga(
       mangaModel,
       chapters: chapterModels,
+      pages: pageModels,
       replaceChapters: true,
     );
 
     return updatedManga;
+  }
+
+  @override
+  Future<List<PageImage>> fetchChapterPages({
+    required String sourceId,
+    required String mangaId,
+    required String chapterId,
+  }) async {
+    final remote = _resolveRemote(sourceId);
+    final remotePages = await remote.fetchChapterPages(
+      mangaSlug: mangaId,
+      chapterId: chapterId,
+    );
+
+    if (remotePages.isNotEmpty) {
+      return remotePages.map((page) => page.toDomain()).toList(growable: false);
+    }
+
+    final pageModels = await _localDataSource.getPagesForChapter(chapterId);
+    if (pageModels.isEmpty) {
+      return const <PageImage>[];
+    }
+    return pageModels.map((model) => model.toEntity()).toList(growable: false);
   }
 }

@@ -1,6 +1,7 @@
 import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
+import 'package:manga_offline/domain/entities/page_image.dart';
 
 /// Lightweight summary returned by remote catalog sources.
 class RemoteMangaSummary {
@@ -106,6 +107,45 @@ class RemoteChapterSummary {
   }
 }
 
+/// Remote representation for an individual page image belonging to a chapter.
+class RemotePageImage {
+  const RemotePageImage({
+    required this.externalId,
+    required this.chapterId,
+    required this.pageNumber,
+    required this.imageUrl,
+    this.checksum,
+  });
+
+  /// Identifier provided by the remote API.
+  final String externalId;
+
+  /// Chapter identifier the page belongs to.
+  final String chapterId;
+
+  /// Position of the page within the chapter (1-indexed).
+  final int pageNumber;
+
+  /// Public URL that can be used to fetch the image while online.
+  final String imageUrl;
+
+  /// Optional checksum or hash string for integrity validations.
+  final String? checksum;
+
+  /// Maps the remote representation into the [PageImage] domain entity.
+  PageImage toDomain() {
+    final normalizedId = externalId.isEmpty
+        ? '${chapterId}_$pageNumber'
+        : externalId;
+    return PageImage(
+      id: normalizedId,
+      chapterId: chapterId,
+      pageNumber: pageNumber,
+      remoteUrl: imageUrl,
+    );
+  }
+}
+
 /// Contract that all remote catalog data sources must implement.
 abstract class CatalogRemoteDataSource {
   /// Identifier that maps to the domain source configuration.
@@ -121,5 +161,11 @@ abstract class CatalogRemoteDataSource {
   /// Retrieves all chapter summaries for the manga identified by [mangaSlug].
   Future<List<RemoteChapterSummary>> fetchAllChapters({
     required String mangaSlug,
+  });
+
+  /// Retrieves the list of pages that compose a given chapter.
+  Future<List<RemotePageImage>> fetchChapterPages({
+    required String mangaSlug,
+    required String chapterId,
   });
 }
