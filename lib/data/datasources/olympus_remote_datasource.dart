@@ -74,33 +74,78 @@ class OlympusRemoteDataSource implements CatalogRemoteDataSource {
     required String mangaSlug,
     required String chapterId,
   }) async {
+    // Endpoint correcto para obtener páginas individuales del capítulo:
+    // https://olympusbiblioteca.com/api/capitulo/{slug}/{chapterId}?type=comic
     final uri = Uri(
-      scheme: _baseChaptersUri.scheme,
-      host: _baseChaptersUri.host,
-      port: _baseChaptersUri.hasPort ? _baseChaptersUri.port : null,
-      path: '${_baseChaptersUri.path}/$mangaSlug/chapters/$chapterId',
+      scheme: 'https',
+      host: 'olympusbiblioteca.com',
+      path: '/api/capitulo/$mangaSlug/$chapterId',
+      queryParameters: const {'type': 'comic'},
+    );
+    developer.log(
+      'fetchChapterPages request slug=$mangaSlug chapter=$chapterId uri=${uri.toString()}',
+      name: 'OlympusRemoteDataSource',
     );
 
     final response = await _httpClient.get(uri);
     if (response.statusCode != 200) {
+      developer.log(
+        'fetchChapterPages error status=${response.statusCode} slug=$mangaSlug chapter=$chapterId',
+        name: 'OlympusRemoteDataSource',
+      );
       throw http.ClientException(
         'Failed to fetch Olympus chapter $chapterId for $mangaSlug (status ${response.statusCode})',
         uri,
       );
     }
 
-    final jsonPayload = jsonDecode(response.body) as Map<String, dynamic>;
-    final pagesPayload = _extractPagesPayload(jsonPayload);
+    final jsonPayload = jsonDecode(response.body);
+    if (jsonPayload is! Map<String, dynamic>) {
+      developer.log(
+        'fetchChapterPages unexpected root JSON type=${jsonPayload.runtimeType}',
+        name: 'OlympusRemoteDataSource',
+      );
+      return const <RemotePageImage>[];
+    }
 
-    final result = <RemotePageImage>[];
-    for (final entry in pagesPayload) {
-      final mapped = _mapPageImage(chapterId, entry);
-      if (mapped != null) {
-        result.add(mapped);
+    developer.log(
+      'fetchChapterPages raw keys=${jsonPayload.keys.toList()}',
+      name: 'OlympusRemoteDataSource',
+    );
+
+    // Camino principal: chapter.pages (List<String>)
+    final chapter = jsonPayload['chapter'];
+    if (chapter is Map<String, dynamic>) {
+      final pages = chapter['pages'];
+      if (pages is List) {
+        final stringUrls = pages.whereType<String>().toList();
+        if (stringUrls.isNotEmpty) {
+          final mapped = _mapStringPagesList(chapterId, stringUrls);
+          developer.log(
+            'fetchChapterPages parsed pages=${mapped.length} (chapter.pages strings) slug=$mangaSlug chapter=$chapterId',
+            name: 'OlympusRemoteDataSource',
+          );
+          return mapped;
+        }
       }
     }
 
-    return result;
+    // Fallback: lógica anterior buscando listas de maps.
+    final pagesPayload = _extractPagesPayload(jsonPayload);
+    if (pagesPayload.isNotEmpty) {
+      final mapped = _mapPageList(chapterId, pagesPayload);
+      developer.log(
+        'fetchChapterPages parsed pages=${mapped.length} (fallback structured) slug=$mangaSlug chapter=$chapterId',
+        name: 'OlympusRemoteDataSource',
+      );
+      return mapped;
+    }
+
+    developer.log(
+      'fetchChapterPages no pages found slug=$mangaSlug chapter=$chapterId',
+      name: 'OlympusRemoteDataSource',
+    );
+    return const <RemotePageImage>[];
   }
 
   /// Releases resources associated with the underlying HTTP client.
@@ -285,6 +330,44 @@ class OlympusRemoteDataSource implements CatalogRemoteDataSource {
       port: _baseChaptersUri.hasPort ? _baseChaptersUri.port : null,
       path: url.startsWith('/') ? url : '${_baseChaptersUri.path}/$url',
     ).toString();
+  }
+
+  List<RemotePageImage> _mapPageList(
+    String chapterId,
+    Iterable<Map<String, dynamic>> entries,
+  ) {
+    final result = <RemotePageImage>[];
+    for (final entry in entries) {
+      final mapped = _mapPageImage(chapterId, entry);
+      if (mapped != null) {
+        result.add(mapped);
+      }
+    }
+    // Normalize ordering by page number to avoid random order from API.
+    result.sort((a, b) => a.pageNumber.compareTo(b.pageNumber));
+    return result;
+  }
+
+  List<RemotePageImage> _mapStringPagesList(
+    String chapterId,
+    List<String> urls,
+  ) {
+    final List<RemotePageImage> result = [];
+    for (var i = 0; i < urls.length; i++) {
+      final url = urls[i];
+      final resolved = _resolveImageUrl(url);
+      result.add(
+        RemotePageImage(
+          externalId: '${chapterId}_${i + 1}',
+          chapterId: chapterId,
+          // Page numbers se enumeran empezando en 1.
+          pageNumber: i + 1,
+          imageUrl: resolved,
+          checksum: null,
+        ),
+      );
+    }
+    return result;
   }
 }
 

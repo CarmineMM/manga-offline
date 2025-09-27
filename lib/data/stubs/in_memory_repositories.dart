@@ -265,22 +265,49 @@ class InMemoryCatalogRepository implements CatalogRepository {
     required String sourceId,
     required String mangaId,
   }) async {
-    final summary = (_catalogBySource[sourceId] ?? const <Manga>[]).firstWhere(
+    final list = _catalogBySource[sourceId] ?? const <Manga>[];
+    final summary = list.firstWhere(
       (manga) => manga.id == mangaId,
       orElse: () =>
           Manga(id: mangaId, sourceId: sourceId, title: 'Manga desconocido'),
     );
 
-    final chapters =
-        _chaptersByManga[mangaId] ??
-        _buildChaptersForManga(mangaId: mangaId, sourceId: sourceId);
-    _chaptersByManga[mangaId] = chapters;
+    List<Chapter> chapters;
+    final remote = _remoteDataSources[sourceId];
+    if (remote != null) {
+      try {
+        final remoteChapters = await remote.fetchAllChapters(
+          mangaSlug: mangaId,
+        );
+        chapters = remoteChapters
+            .map((c) => c.toDomain(indexFallback: remoteChapters.length))
+            .toList(growable: false);
+        developer.log(
+          'fetchMangaDetail remote chapters=${chapters.length} manga=$mangaId',
+          name: 'InMemoryCatalogRepository',
+        );
+      } catch (error, stack) {
+        developer.log(
+          'fetchMangaDetail remote chapters error fallback local',
+          name: 'InMemoryCatalogRepository',
+          error: error,
+          stackTrace: stack,
+        );
+        chapters =
+            _chaptersByManga[mangaId] ??
+            _buildChaptersForManga(mangaId: mangaId, sourceId: sourceId);
+      }
+    } else {
+      chapters =
+          _chaptersByManga[mangaId] ??
+          _buildChaptersForManga(mangaId: mangaId, sourceId: sourceId);
+    }
 
+    _chaptersByManga[mangaId] = chapters;
     final detailed = summary.copyWith(
       chapters: chapters,
       totalChapters: chapters.length,
     );
-
     await _mangaRepository.saveManga(detailed);
     return detailed;
   }
@@ -309,30 +336,63 @@ class InMemoryCatalogRepository implements CatalogRepository {
     required String mangaId,
     required String chapterId,
   }) async {
-    final existing = _pagesByChapter[chapterId];
-    if (existing != null) {
+    final cache = _pagesByChapter[chapterId];
+    if (cache != null) {
       developer.log(
-        'Páginas en caché para capítulo $chapterId (count=${existing.length})',
+        'fetchChapterPages cache hit chapter=$chapterId count=${cache.length}',
         name: 'InMemoryCatalogRepository',
       );
-      return existing;
+      return cache;
     }
 
-    final pages = List<PageImage>.generate(15, (index) {
+    final remote = _remoteDataSources[sourceId];
+    if (remote != null) {
+      try {
+        final remotePages = await remote.fetchChapterPages(
+          mangaSlug: mangaId,
+          chapterId: chapterId,
+        );
+        final mapped = remotePages
+            .map((p) => p.toDomain())
+            .toList(growable: false);
+        developer.log(
+          'fetchChapterPages remote chapter=$chapterId pages=${mapped.length}',
+          name: 'InMemoryCatalogRepository',
+        );
+        if (mapped.isNotEmpty) {
+          _pagesByChapter[chapterId] = mapped;
+          return mapped;
+        } else {
+          developer.log(
+            'fetchChapterPages remote returned 0 pages (will fallback) chapter=$chapterId',
+            name: 'InMemoryCatalogRepository',
+          );
+        }
+      } catch (error, stack) {
+        developer.log(
+          'fetchChapterPages remote error fallback mock',
+          name: 'InMemoryCatalogRepository',
+          error: error,
+          stackTrace: stack,
+        );
+      }
+    }
+
+    final mock = List<PageImage>.generate(5, (index) {
       final number = index + 1;
       return PageImage(
         id: '$chapterId-$number',
         chapterId: chapterId,
         pageNumber: number,
-        remoteUrl: 'https://example.com/$chapterId/$number.jpg',
+        remoteUrl: 'https://fallback.local/$chapterId/$number.png',
       );
     });
-    _pagesByChapter[chapterId] = pages;
+    _pagesByChapter[chapterId] = mock;
     developer.log(
-      'Generadas ${pages.length} páginas ficticias para $chapterId',
+      'fetchChapterPages mock chapter=$chapterId pages=${mock.length}',
       name: 'InMemoryCatalogRepository',
     );
-    return pages;
+    return mock;
   }
 }
 
