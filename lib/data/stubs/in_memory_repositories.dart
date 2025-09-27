@@ -363,7 +363,7 @@ class InMemoryCatalogRepository implements CatalogRepository {
           final mapped = persisted
               .map(
                 (e) => PageImage(
-                  id: '${chapterId}-${e.pageNumber}',
+                  id: '$chapterId-${e.pageNumber}',
                   chapterId: chapterId,
                   pageNumber: e.pageNumber,
                   remoteUrl: e.imageUrl,

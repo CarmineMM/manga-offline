@@ -314,7 +314,7 @@ class _MangaHeaderLayoutState extends State<_MangaHeaderLayout> {
     const collapsedMaxChars = 260; // approx 5-6 lines depending on device.
     final needsCollapse = synopsisText.length > collapsedMaxChars;
     final displayText = !_expanded && needsCollapse
-        ? synopsisText.substring(0, collapsedMaxChars) + '…'
+        ? '${synopsisText.substring(0, collapsedMaxChars)}…'
         : synopsisText;
 
     return Column(
@@ -348,7 +348,7 @@ class _CoverImage extends StatelessWidget {
       width: 100,
       height: 150,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: borderRadius,
       ),
       child: Icon(
@@ -372,7 +372,7 @@ class _CoverImage extends StatelessWidget {
           loadingBuilder: (context, child, loadingProgress) {
             if (loadingProgress == null) return child;
             return Container(
-              color: Theme.of(context).colorScheme.surfaceVariant,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               alignment: Alignment.center,
               child: const SizedBox(
                 width: 28,
