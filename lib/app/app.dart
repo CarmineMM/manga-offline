@@ -1,0 +1,23 @@
+import 'package:flutter/material.dart';
+import 'package:manga_offline/presentation/screens/library/library_screen.dart';
+
+/// Root widget for the Manga Offline application.
+///
+/// This widget wires base theme configuration and the initial navigation
+/// endpoint. Feature-specific routes will be added as the app evolves.
+class MangaOfflineApp extends StatelessWidget {
+  /// Creates a new [MangaOfflineApp] instance.
+  const MangaOfflineApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Manga Offline',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),
+      home: const LibraryScreen(),
+    );
+  }
+}
