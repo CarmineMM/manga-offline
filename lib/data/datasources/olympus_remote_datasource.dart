@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
+import 'package:manga_offline/core/debug/debug_logger.dart';
 import 'package:manga_offline/data/datasources/catalog_remote_datasource.dart';
 
 /// Remote data source in charge of fetching catalog information from the
@@ -11,17 +12,20 @@ class OlympusRemoteDataSource implements CatalogRemoteDataSource {
     http.Client? httpClient,
     Uri? baseSeriesUri,
     Uri? baseChaptersUri,
+    DebugLogger? debugLogger,
   }) : _httpClient = httpClient ?? http.Client(),
        _baseSeriesUri =
            baseSeriesUri ??
            Uri.parse('https://olympusbiblioteca.com/api/series'),
        _baseChaptersUri =
            baseChaptersUri ??
-           Uri.parse('https://dashboard.olympusbiblioteca.com/api/series');
+           Uri.parse('https://dashboard.olympusbiblioteca.com/api/series'),
+       _debugLogger = debugLogger;
 
   final http.Client _httpClient;
   final Uri _baseSeriesUri;
   final Uri _baseChaptersUri;
+  final DebugLogger? _debugLogger;
 
   @override
   String get sourceId => 'olympus';
@@ -87,8 +91,31 @@ class OlympusRemoteDataSource implements CatalogRemoteDataSource {
       name: 'OlympusRemoteDataSource',
     );
 
-    final response = await _httpClient.get(uri);
-    if (response.statusCode != 200) {
+    final stopwatch = Stopwatch()..start();
+    http.Response response;
+    try {
+      response = await _httpClient.get(uri);
+    } catch (error) {
+      stopwatch.stop();
+      _recordNetworkEvent(
+        method: 'GET',
+        uri: uri,
+        success: false,
+        duration: stopwatch.elapsed,
+        error: error,
+      );
+      rethrow;
+    }
+    stopwatch.stop();
+    final isSuccess = response.statusCode == 200;
+    _recordNetworkEvent(
+      method: 'GET',
+      uri: uri,
+      statusCode: response.statusCode,
+      duration: stopwatch.elapsed,
+      success: isSuccess,
+    );
+    if (!isSuccess) {
       developer.log(
         'fetchChapterPages error status=${response.statusCode} slug=$mangaSlug chapter=$chapterId',
         name: 'OlympusRemoteDataSource',
@@ -162,8 +189,31 @@ class OlympusRemoteDataSource implements CatalogRemoteDataSource {
       },
     );
 
-    final response = await _httpClient.get(uri);
-    if (response.statusCode != 200) {
+    final stopwatch = Stopwatch()..start();
+    http.Response response;
+    try {
+      response = await _httpClient.get(uri);
+    } catch (error) {
+      stopwatch.stop();
+      _recordNetworkEvent(
+        method: 'GET',
+        uri: uri,
+        success: false,
+        duration: stopwatch.elapsed,
+        error: error,
+      );
+      rethrow;
+    }
+    stopwatch.stop();
+    final isSuccess = response.statusCode == 200;
+    _recordNetworkEvent(
+      method: 'GET',
+      uri: uri,
+      statusCode: response.statusCode,
+      duration: stopwatch.elapsed,
+      success: isSuccess,
+    );
+    if (!isSuccess) {
       throw http.ClientException(
         'Failed to fetch Olympus series page $page (status ${response.statusCode})',
         uri,
@@ -222,8 +272,31 @@ class OlympusRemoteDataSource implements CatalogRemoteDataSource {
       },
     );
 
-    final response = await _httpClient.get(uri);
-    if (response.statusCode != 200) {
+    final stopwatch = Stopwatch()..start();
+    http.Response response;
+    try {
+      response = await _httpClient.get(uri);
+    } catch (error) {
+      stopwatch.stop();
+      _recordNetworkEvent(
+        method: 'GET',
+        uri: uri,
+        success: false,
+        duration: stopwatch.elapsed,
+        error: error,
+      );
+      rethrow;
+    }
+    stopwatch.stop();
+    final isSuccess = response.statusCode == 200;
+    _recordNetworkEvent(
+      method: 'GET',
+      uri: uri,
+      statusCode: response.statusCode,
+      duration: stopwatch.elapsed,
+      success: isSuccess,
+    );
+    if (!isSuccess) {
       throw http.ClientException(
         'Failed to fetch Olympus chapters page $page for $slug (status ${response.statusCode})',
         uri,
@@ -368,6 +441,25 @@ class OlympusRemoteDataSource implements CatalogRemoteDataSource {
       );
     }
     return result;
+  }
+
+  void _recordNetworkEvent({
+    required String method,
+    required Uri uri,
+    required bool success,
+    int? statusCode,
+    Duration? duration,
+    Object? error,
+  }) {
+    _debugLogger?.logNetworkEvent(
+      sourceId: sourceId,
+      method: method,
+      uri: uri,
+      success: success,
+      statusCode: statusCode,
+      duration: duration,
+      error: error?.toString(),
+    );
   }
 }
 

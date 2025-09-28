@@ -4,6 +4,7 @@ import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:manga_offline/data/datasources/cache/page_cache_datasource.dart';
 import 'package:manga_offline/data/datasources/cache/reading_progress_datasource.dart';
+import 'package:manga_offline/core/debug/debug_logger.dart';
 import 'package:manga_offline/core/utils/reader_preferences.dart';
 import 'package:manga_offline/core/utils/source_preferences.dart';
 
@@ -16,6 +17,7 @@ import 'package:manga_offline/domain/repositories/manga_repository.dart';
 import 'package:manga_offline/domain/repositories/source_repository.dart';
 import 'package:manga_offline/domain/usecases/fetch_chapter_pages.dart';
 import 'package:manga_offline/domain/usecases/fetch_manga_detail.dart';
+import 'package:manga_offline/domain/usecases/fetch_source_catalog.dart';
 import 'package:manga_offline/domain/usecases/get_available_sources.dart';
 import 'package:manga_offline/domain/usecases/sync_source_catalog.dart';
 import 'package:manga_offline/domain/usecases/update_source_selection.dart';
@@ -24,6 +26,7 @@ import 'package:manga_offline/domain/usecases/watch_download_queue.dart';
 import 'package:manga_offline/domain/usecases/watch_downloaded_mangas.dart';
 import 'package:manga_offline/domain/usecases/queue_chapter_download.dart';
 import 'package:manga_offline/domain/usecases/queue_manga_download.dart';
+import 'package:manga_offline/presentation/blocs/debug/debug_log_cubit.dart';
 import 'package:manga_offline/presentation/blocs/library/library_cubit.dart';
 import 'package:manga_offline/presentation/blocs/manga_detail/manga_detail_cubit.dart';
 import 'package:manga_offline/presentation/blocs/sources/sources_cubit.dart';
@@ -41,12 +44,14 @@ Future<void> configureDependencies() async {
     await serviceLocator.reset();
   }
 
+  final debugLogger = DebugLogger();
+
   // Inicializa Isar (persistencia local). Añadimos PageEntity para cache de páginas.
   final appDir = await getApplicationDocumentsDirectory();
   // Nota: PageEntitySchema se genera vía build_runner. Asegúrate de ejecutar
   // `flutter pub run build_runner build --delete-conflicting-outputs`
   // después de este cambio para evitar errores de símbolo no definido.
-  late final Isar isar;
+  Isar? isar;
   try {
     isar = await Isar.open(
       [PageEntitySchema, ReadingProgressEntitySchema],
@@ -54,14 +59,21 @@ Future<void> configureDependencies() async {
       inspector: false,
     );
   } catch (e) {
-    // En entorno de test sin generar aún el código, podemos re-lanzar para hacerlo visible.
-    rethrow;
+    isar = null;
   }
-  final pageCache = IsarPageCacheDataSource(isar);
-  final readingProgressDs = ReadingProgressDataSource(isar);
+  late final PageCacheDataSource pageCache;
+  late final ReadingProgressDataSource readingProgressDs;
+  if (isar != null) {
+    final Isar isarInstance = isar;
+    pageCache = IsarPageCacheDataSource(isarInstance);
+    readingProgressDs = ReadingProgressDataSource(isarInstance);
+  } else {
+    pageCache = InMemoryPageCacheDataSource();
+    readingProgressDs = ReadingProgressDataSource.inMemory();
+  }
 
   final inMemoryMangaRepository = InMemoryMangaRepository();
-  final olympusRemote = OlympusRemoteDataSource();
+  final olympusRemote = OlympusRemoteDataSource(debugLogger: debugLogger);
   final inMemoryCatalogRepository = InMemoryCatalogRepository(
     inMemoryMangaRepository,
     remoteDataSources: {olympusRemote.sourceId: olympusRemote},
@@ -82,6 +94,7 @@ Future<void> configureDependencies() async {
   );
 
   serviceLocator
+    ..registerSingleton<DebugLogger>(debugLogger)
     ..registerSingleton<MangaRepository>(inMemoryMangaRepository)
     ..registerSingleton<CatalogRepository>(inMemoryCatalogRepository)
     ..registerSingleton<SourceRepository>(inMemorySourceRepository)
@@ -94,6 +107,7 @@ Future<void> configureDependencies() async {
     ..registerLazySingleton(() => WatchDownloadQueue(serviceLocator()))
     ..registerLazySingleton(() => FetchMangaDetail(serviceLocator()))
     ..registerLazySingleton(() => FetchChapterPages(serviceLocator()))
+    ..registerLazySingleton(() => FetchSourceCatalog(serviceLocator()))
     ..registerLazySingleton(() => GetAvailableSources(serviceLocator()))
     ..registerLazySingleton(() => WatchAvailableSources(serviceLocator()))
     ..registerLazySingleton(() => UpdateSourceSelection(serviceLocator()))
@@ -101,6 +115,7 @@ Future<void> configureDependencies() async {
     ..registerLazySingleton(() => QueueChapterDownload(serviceLocator()))
     ..registerLazySingleton(() => QueueMangaDownload(serviceLocator()))
     ..registerFactory(() => LibraryCubit(serviceLocator()))
+    ..registerFactory(() => DebugLogCubit(serviceLocator()))
     ..registerFactory(
       () => MangaDetailCubit(
         fetchMangaDetail: serviceLocator(),
@@ -115,6 +130,7 @@ Future<void> configureDependencies() async {
         getAvailableSources: serviceLocator(),
         updateSourceSelection: serviceLocator(),
         syncSourceCatalog: serviceLocator(),
+        fetchSourceCatalog: serviceLocator(),
         sourcePreferences: serviceLocator<SourcePreferences>(),
       ),
     );

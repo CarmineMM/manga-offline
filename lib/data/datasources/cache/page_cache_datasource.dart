@@ -118,3 +118,76 @@ class IsarPageCacheDataSource implements PageCacheDataSource {
     });
   }
 }
+
+class InMemoryPageCacheDataSource implements PageCacheDataSource {
+  final Map<String, List<PageEntity>> _pagesByKey = {};
+
+  String _composeKey(String sourceId, String mangaSlug, String chapterId) {
+    return '$sourceId::$mangaSlug::$chapterId';
+  }
+
+  @override
+  Future<List<PageEntity>> getChapterPages({
+    required String sourceId,
+    required String mangaSlug,
+    required String chapterId,
+  }) async {
+    final key = _composeKey(sourceId, mangaSlug, chapterId);
+    final stored = _pagesByKey[key];
+    if (stored == null) {
+      return const [];
+    }
+    final cloned = stored
+        .map((page) {
+          final copy = PageEntity()
+            ..id = page.id
+            ..sourceId = page.sourceId
+            ..mangaSlug = page.mangaSlug
+            ..chapterId = page.chapterId
+            ..pageNumber = page.pageNumber
+            ..imageUrl = page.imageUrl
+            ..checksum = page.checksum
+            ..createdAt = page.createdAt;
+          return copy;
+        })
+        .toList(growable: false);
+    cloned.sort((a, b) => a.pageNumber.compareTo(b.pageNumber));
+    return cloned;
+  }
+
+  @override
+  Future<void> putChapterPages({
+    required String sourceId,
+    required String mangaSlug,
+    required String chapterId,
+    required List<PageEntity> pages,
+  }) async {
+    if (pages.isEmpty) return;
+    final key = _composeKey(sourceId, mangaSlug, chapterId);
+    final now = DateTime.now();
+    final storedPages = <PageEntity>[];
+    for (final page in pages) {
+      final copy = PageEntity()
+        ..id = page.id
+        ..sourceId = sourceId
+        ..mangaSlug = mangaSlug
+        ..chapterId = chapterId
+        ..pageNumber = page.pageNumber
+        ..imageUrl = page.imageUrl
+        ..checksum = page.checksum
+        ..createdAt = now;
+      storedPages.add(copy);
+    }
+    _pagesByKey[key] = storedPages;
+  }
+
+  @override
+  Future<void> clearChapterPages({
+    required String sourceId,
+    required String mangaSlug,
+    required String chapterId,
+  }) async {
+    final key = _composeKey(sourceId, mangaSlug, chapterId);
+    _pagesByKey.remove(key);
+  }
+}

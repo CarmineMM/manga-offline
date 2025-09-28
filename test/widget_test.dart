@@ -5,13 +5,21 @@
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manga_offline/app/app.dart';
 import 'package:manga_offline/core/di/service_locator.dart';
 import 'package:manga_offline/presentation/widgets/empty_state.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUp(() async {
+    PathProviderPlatform.instance = _FakePathProviderPlatform();
+    SharedPreferences.setMockInitialValues({});
     await configureDependencies();
   });
 
@@ -34,4 +42,12 @@ void main() {
     expect(emptyWidget.message, contains('Aún no tienes mangas descargados'));
     expect(find.text('Biblioteca'), findsWidgets);
   });
+}
+
+class _FakePathProviderPlatform extends PathProviderPlatform {
+  @override
+  Future<String?> getApplicationDocumentsPath() async {
+    final tempDir = await Directory.systemTemp.createTemp('manga_offline_test');
+    return tempDir.path;
+  }
 }

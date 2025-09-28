@@ -15,8 +15,14 @@ class ReadingProgressEntity {
 
 /// DataSource for reading progress.
 class ReadingProgressDataSource {
-  ReadingProgressDataSource(this._isar);
-  final Isar _isar;
+  ReadingProgressDataSource(Isar isar) : _isar = isar, _memoryStore = null;
+
+  ReadingProgressDataSource.inMemory()
+    : _isar = null,
+      _memoryStore = <String, ReadingProgressEntity>{};
+
+  final Isar? _isar;
+  final Map<String, ReadingProgressEntity>? _memoryStore;
 
   Future<void> upsertProgress({
     required String sourceId,
@@ -24,38 +30,66 @@ class ReadingProgressDataSource {
     required String chapterId,
     required int lastReadPage, // 1-based
   }) async {
-    await _isar.writeTxn(() async {
-      final existing = await _isar.readingProgressEntitys
-          .filter()
-          .chapterIdEqualTo(chapterId)
-          .findFirst();
-      if (existing != null) {
-        existing.lastReadPage = lastReadPage;
-        existing.lastReadAt = DateTime.now();
-        await _isar.readingProgressEntitys.put(existing);
-      } else {
-        final e = ReadingProgressEntity()
+    final isar = _isar;
+    if (isar != null) {
+      await isar.writeTxn(() async {
+        final existing = await isar.readingProgressEntitys
+            .filter()
+            .chapterIdEqualTo(chapterId)
+            .findFirst();
+        if (existing != null) {
+          existing.lastReadPage = lastReadPage;
+          existing.lastReadAt = DateTime.now();
+          await isar.readingProgressEntitys.put(existing);
+        } else {
+          final e = ReadingProgressEntity()
+            ..chapterId = chapterId
+            ..mangaId = mangaId
+            ..sourceId = sourceId
+            ..lastReadPage = lastReadPage
+            ..lastReadAt = DateTime.now();
+          await isar.readingProgressEntitys.put(e);
+        }
+      });
+      return;
+    }
+
+    final store = _memoryStore!;
+    final existing = store[chapterId];
+    final entity =
+        existing ??
+        (ReadingProgressEntity()
+          ..id = store.length + 1
           ..chapterId = chapterId
           ..mangaId = mangaId
-          ..sourceId = sourceId
-          ..lastReadPage = lastReadPage
-          ..lastReadAt = DateTime.now();
-        await _isar.readingProgressEntitys.put(e);
-      }
-    });
+          ..sourceId = sourceId);
+    entity.lastReadPage = lastReadPage;
+    entity.lastReadAt = DateTime.now();
+    store[chapterId] = entity;
   }
 
   Future<ReadingProgressEntity?> getProgress(String chapterId) {
-    return _isar.readingProgressEntitys
-        .filter()
-        .chapterIdEqualTo(chapterId)
-        .findFirst();
+    final isar = _isar;
+    if (isar != null) {
+      return isar.readingProgressEntitys
+          .filter()
+          .chapterIdEqualTo(chapterId)
+          .findFirst();
+    }
+    return Future<ReadingProgressEntity?>.value(_memoryStore![chapterId]);
   }
 
   Future<List<ReadingProgressEntity>> getProgressForManga(String mangaId) {
-    return _isar.readingProgressEntitys
-        .filter()
-        .mangaIdEqualTo(mangaId)
-        .findAll();
+    final isar = _isar;
+    if (isar != null) {
+      return isar.readingProgressEntitys
+          .filter()
+          .mangaIdEqualTo(mangaId)
+          .findAll();
+    }
+    final result = _memoryStore!.values
+        .where((entity) => entity.mangaId == mangaId)
+        .toList(growable: false);
+    return Future<List<ReadingProgressEntity>>.value(result);
   }
 }

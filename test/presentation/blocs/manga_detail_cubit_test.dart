@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:manga_offline/data/datasources/cache/reading_progress_datasource.dart';
 import 'package:manga_offline/data/stubs/in_memory_repositories.dart';
 import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/download_task.dart';
@@ -8,7 +9,6 @@ import 'package:manga_offline/domain/usecases/fetch_manga_detail.dart';
 import 'package:manga_offline/domain/usecases/queue_chapter_download.dart';
 import 'package:manga_offline/domain/usecases/watch_downloaded_mangas.dart';
 import 'package:manga_offline/presentation/blocs/manga_detail/manga_detail_cubit.dart';
-import '../../data/in_memory_reading_progress_datasource.dart';
 
 class _FakeDownloadRepository implements DownloadRepository {
   @override
@@ -50,7 +50,7 @@ void main() {
         fetchMangaDetail: fetchMangaDetail,
         watchDownloadedMangas: watchDownloadedMangas,
         queueChapterDownload: queueChapterDownload,
-        readingProgressDataSource: InMemoryReadingProgressDataSource(),
+        readingProgressDataSource: ReadingProgressDataSource.inMemory(),
       );
     });
 

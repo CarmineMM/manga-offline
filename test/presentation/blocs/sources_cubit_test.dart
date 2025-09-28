@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manga_offline/data/stubs/in_memory_repositories.dart';
+import 'package:manga_offline/domain/usecases/fetch_source_catalog.dart';
 import 'package:manga_offline/domain/usecases/get_available_sources.dart';
 import 'package:manga_offline/domain/usecases/sync_source_catalog.dart';
 import 'package:manga_offline/domain/usecases/update_source_selection.dart';
@@ -22,6 +23,7 @@ void main() {
         getAvailableSources: GetAvailableSources(sourceRepository),
         updateSourceSelection: UpdateSourceSelection(sourceRepository),
         syncSourceCatalog: SyncSourceCatalog(catalogRepository),
+        fetchSourceCatalog: FetchSourceCatalog(catalogRepository),
       );
     });
 
@@ -39,8 +41,7 @@ void main() {
     test('enabling a source triggers catalog sync', () async {
       await cubit.start();
 
-      final libraryFuture =
-          mangaRepository.watchLocalLibrary().skip(1).first;
+      final libraryFuture = mangaRepository.watchLocalLibrary().skip(1).first;
 
       await cubit.toggleSource(sourceId: 'olympus', isEnabled: true);
 

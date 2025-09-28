@@ -4,7 +4,9 @@ import 'package:manga_offline/core/di/service_locator.dart';
 import 'package:manga_offline/core/utils/source_preferences.dart';
 import 'package:manga_offline/domain/entities/manga_source.dart';
 import 'package:manga_offline/domain/entities/source_capability.dart';
+import 'package:manga_offline/presentation/blocs/debug/debug_log_cubit.dart';
 import 'package:manga_offline/presentation/blocs/sources/sources_cubit.dart';
+import 'package:manga_offline/presentation/screens/debug/debug_screen.dart';
 
 /// Screen responsible for managing source selection and syncing.
 class SettingsScreen extends StatelessWidget {
@@ -60,6 +62,9 @@ class _SettingsBody extends StatelessWidget {
             if (index == 0) {
               return const _SourcesIntroCard();
             }
+            if (index == state.sources.length + 1) {
+              return const _DebugToolsTile();
+            }
             final source = state.sources[index - 1];
             return _SourceTile(
               source: source,
@@ -67,7 +72,7 @@ class _SettingsBody extends StatelessWidget {
             );
           },
           separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemCount: state.sources.length + 1,
+          itemCount: state.sources.length + 2,
         );
     }
   }
@@ -222,5 +227,32 @@ class _SourceTile extends StatelessWidget {
       case SourceCapability.fullDownload:
         return 'Descarga completa';
     }
+  }
+}
+
+class _DebugToolsTile extends StatelessWidget {
+  const _DebugToolsTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.bug_report_outlined),
+        title: const Text('Panel de debug'),
+        subtitle: const Text(
+          'Consulta peticiones recientes, códigos de estado y errores.',
+        ),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => BlocProvider<DebugLogCubit>(
+                create: (_) => serviceLocator<DebugLogCubit>()..start(),
+                child: const DebugScreen(),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
