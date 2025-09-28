@@ -5,7 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:manga_offline/domain/entities/manga_source.dart';
 import 'package:manga_offline/domain/usecases/fetch_source_catalog.dart';
 import 'package:manga_offline/domain/usecases/get_available_sources.dart';
-import 'package:manga_offline/domain/usecases/get_source_last_sync.dart';
 import 'package:manga_offline/domain/usecases/mark_source_synced.dart';
 import 'package:manga_offline/domain/usecases/sync_source_catalog.dart';
 import 'package:manga_offline/domain/usecases/update_source_selection.dart';
@@ -23,14 +22,12 @@ class SourcesCubit extends Cubit<SourcesState> {
     required SyncSourceCatalog syncSourceCatalog,
     required FetchSourceCatalog fetchSourceCatalog,
     required MarkSourceSynced markSourceSynced,
-    required GetSourceLastSync getSourceLastSync,
   }) : _watchAvailableSources = watchAvailableSources,
        _getAvailableSources = getAvailableSources,
        _updateSourceSelection = updateSourceSelection,
        _syncSourceCatalog = syncSourceCatalog,
        _fetchSourceCatalog = fetchSourceCatalog,
        _markSourceSynced = markSourceSynced,
-       _getSourceLastSync = getSourceLastSync,
        super(const SourcesState.initial());
 
   final WatchAvailableSources _watchAvailableSources;
@@ -39,9 +36,6 @@ class SourcesCubit extends Cubit<SourcesState> {
   final SyncSourceCatalog _syncSourceCatalog;
   final FetchSourceCatalog _fetchSourceCatalog;
   final MarkSourceSynced _markSourceSynced;
-  final GetSourceLastSync _getSourceLastSync;
-
-  static const Duration _catalogStaleThreshold = Duration(hours: 12);
 
   StreamSubscription<List<MangaSource>>? _subscription;
 
@@ -52,7 +46,6 @@ class SourcesCubit extends Cubit<SourcesState> {
     try {
       final sources = await _getAvailableSources();
       emit(state.copyWith(status: SourcesStatus.ready, sources: sources));
-      unawaited(_autoSyncEnabledSources(sources));
     } catch (error) {
       emit(
         state.copyWith(
@@ -134,27 +127,6 @@ class SourcesCubit extends Cubit<SourcesState> {
     }
   }
 
-  Future<void> _autoSyncEnabledSources(List<MangaSource> sources) async {
-    for (final source in sources) {
-      if (!source.isEnabled) {
-        continue;
-      }
-      try {
-        final needsSync = await _shouldSyncOnEnable(source.id);
-        if (!needsSync) {
-          continue;
-        }
-        await _performSyncOperation(
-          sourceId: source.id,
-          operation: () => _syncAndStamp(source.id),
-        );
-      } catch (_) {
-        // The state already reflects the failure; keep iterating over
-        // the remaining sources.
-      }
-    }
-  }
-
   Future<void> _performSyncOperation({
     required String sourceId,
     required Future<void> Function() operation,
@@ -189,14 +161,7 @@ class SourcesCubit extends Cubit<SourcesState> {
       // recover from the inconsistent state.
       return true;
     }
-
-    final lastSync = await _getSourceLastSync(sourceId);
-    if (lastSync == null) {
-      return true;
-    }
-
-    final now = DateTime.now();
-    return now.difference(lastSync) > _catalogStaleThreshold;
+    return false;
   }
 
   Future<void> _syncAndStamp(String sourceId) async {

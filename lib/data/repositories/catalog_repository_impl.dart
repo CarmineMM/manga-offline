@@ -36,9 +36,23 @@ class CatalogRepositoryImpl implements CatalogRepository {
     final timestamp = DateTime.now();
 
     for (final summary in summaries) {
-      final manga = summary.toDomain(lastUpdated: timestamp);
-      final model = MangaModel.fromEntity(manga);
-      await _localDataSource.putManga(model, replaceChapters: false);
+      final existing = await _localDataSource.getManga(summary.slug);
+      if (existing == null) {
+        final manga = summary.toDomain(lastUpdated: timestamp);
+        final model = MangaModel.fromEntity(manga);
+        await _localDataSource.putManga(model, replaceChapters: false);
+        continue;
+      }
+
+      existing
+        ..title = summary.title
+        ..sourceName = summary.sourceName ?? existing.sourceName
+        ..synopsis = summary.synopsis ?? existing.synopsis
+        ..coverImageUrl = summary.coverUrl ?? existing.coverImageUrl
+        ..totalChapters = summary.chapterCount
+        ..lastUpdated = timestamp;
+
+      await _localDataSource.putManga(existing, replaceChapters: false);
     }
   }
 

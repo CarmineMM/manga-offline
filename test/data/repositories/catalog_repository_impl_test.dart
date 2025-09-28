@@ -65,6 +65,7 @@ void main() {
       );
 
       when(() => remote.fetchAllSeries()).thenAnswer((_) async => [summary]);
+      when(() => local.getManga(summary.slug)).thenAnswer((_) async => null);
       when(
         () => local.putManga(
           any(),
@@ -94,6 +95,68 @@ void main() {
       expect(stored.title, equals(summary.title));
       expect(stored.totalChapters, equals(summary.chapterCount));
       expect(storedPages, isEmpty);
+      expect(replaceChapters, isFalse);
+    });
+
+    test('preserves download state for existing manga', () async {
+      const sourceId = 'olympus';
+      const summary = RemoteMangaSummary(
+        externalId: '11',
+        slug: 'academia-de-la-ascension',
+        title: 'Academia de la Ascensión',
+        chapterCount: 174,
+        sourceId: sourceId,
+        sourceName: 'Olympus Biblioteca',
+        coverUrl: 'https://example.com/new-cover.webp',
+        synopsis: null,
+        status: 'Activo',
+      );
+
+      final existing = MangaModel()
+        ..referenceId = summary.slug
+        ..sourceId = sourceId
+        ..title = 'Título previo'
+        ..synopsis = 'Sinopsis almacenada'
+        ..coverImageUrl = 'https://example.com/old-cover.webp'
+        ..coverImagePath = '/data/covers/acad.webp'
+        ..status = DownloadStatus.downloaded
+        ..downloadedChapters = 12
+        ..lastUpdated = DateTime(2024, 1, 1);
+
+      when(() => remote.fetchAllSeries()).thenAnswer((_) async => [summary]);
+      when(
+        () => local.getManga(summary.slug),
+      ).thenAnswer((_) async => existing);
+      when(
+        () => local.putManga(
+          any(),
+          chapters: any(named: 'chapters'),
+          pages: any(named: 'pages'),
+          replaceChapters: any(named: 'replaceChapters'),
+        ),
+      ).thenAnswer((_) async {});
+
+      await repository.syncCatalog(sourceId: sourceId);
+
+      final captured = verify(
+        () => local.putManga(
+          captureAny(),
+          chapters: captureAny(named: 'chapters'),
+          pages: captureAny(named: 'pages'),
+          replaceChapters: captureAny(named: 'replaceChapters'),
+        ),
+      ).captured;
+
+      final MangaModel stored = captured[0] as MangaModel;
+      final bool replaceChapters = captured[3] as bool;
+
+      expect(stored.status, equals(DownloadStatus.downloaded));
+      expect(stored.downloadedChapters, equals(12));
+      expect(stored.coverImagePath, equals('/data/covers/acad.webp'));
+      expect(stored.coverImageUrl, equals(summary.coverUrl));
+      expect(stored.synopsis, equals('Sinopsis almacenada'));
+      expect(stored.title, equals(summary.title));
+      expect(stored.totalChapters, equals(summary.chapterCount));
       expect(replaceChapters, isFalse);
     });
   });

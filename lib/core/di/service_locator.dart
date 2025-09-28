@@ -183,7 +183,6 @@ Future<void> configureDependencies() async {
         syncSourceCatalog: serviceLocator(),
         fetchSourceCatalog: serviceLocator(),
         markSourceSynced: serviceLocator(),
-        getSourceLastSync: serviceLocator(),
       ),
     );
 }
