@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:manga_offline/core/di/service_locator.dart';
@@ -9,6 +11,7 @@ import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/presentation/blocs/manga_detail/manga_detail_cubit.dart';
 import 'package:manga_offline/presentation/widgets/chapter_list_tile.dart';
 import 'package:manga_offline/presentation/screens/reader/chapter_reader_route.dart';
+import 'package:manga_offline/presentation/widgets/cover_image_overrides.dart';
 
 /// Displays the list of chapters for a given manga.
 class ChapterListScreen extends StatelessWidget {
@@ -232,10 +235,12 @@ class _MangaHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cover = manga.coverImageUrl;
+    final coverPath = manga.coverImagePath;
+    final coverUrl = manga.coverImageUrl;
 
     return _MangaHeaderLayout(
-      coverImageUrl: cover,
+      coverImagePath: coverPath,
+      coverImageUrl: coverUrl,
       title: manga.title,
       sourceLabel: _resolveSourceLabel(manga),
       synopsis: manga.synopsis,
@@ -255,6 +260,7 @@ class _MangaHeader extends StatelessWidget {
 /// Internal layout widget for the manga header to keep build method clean.
 class _MangaHeaderLayout extends StatefulWidget {
   const _MangaHeaderLayout({
+    required this.coverImagePath,
     required this.coverImageUrl,
     required this.title,
     required this.sourceLabel,
@@ -262,6 +268,7 @@ class _MangaHeaderLayout extends StatefulWidget {
     required this.totalChapters,
   });
 
+  final String? coverImagePath;
   final String? coverImageUrl;
   final String title;
   final String sourceLabel;
@@ -289,7 +296,7 @@ class _MangaHeaderLayoutState extends State<_MangaHeaderLayout> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            _CoverImage(url: widget.coverImageUrl),
+            _CoverImage(path: widget.coverImagePath, url: widget.coverImageUrl),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -375,8 +382,9 @@ class _MangaHeaderLayoutState extends State<_MangaHeaderLayout> {
 }
 
 class _CoverImage extends StatelessWidget {
-  const _CoverImage({required this.url});
+  const _CoverImage({required this.path, required this.url});
 
+  final String? path;
   final String? url;
 
   @override
@@ -395,6 +403,32 @@ class _CoverImage extends StatelessWidget {
         size: 40,
       ),
     );
+
+    if (_canUseLocalImage(path)) {
+      final override = debugLocalCoverBuilderOverride;
+      if (override != null) {
+        return ClipRRect(
+          borderRadius: borderRadius,
+          child: SizedBox(
+            width: 100,
+            height: 150,
+            child: override(context, path!),
+          ),
+        );
+      }
+      return ClipRRect(
+        borderRadius: borderRadius,
+        child: SizedBox(
+          width: 100,
+          height: 150,
+          child: Image.file(
+            File(path!),
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => placeholder,
+          ),
+        ),
+      );
+    }
 
     if (url == null || url!.isEmpty) return placeholder;
 
@@ -422,5 +456,12 @@ class _CoverImage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  bool _canUseLocalImage(String? localPath) {
+    if (localPath == null || localPath.isEmpty || kIsWeb) {
+      return false;
+    }
+    return File(localPath).existsSync();
   }
 }

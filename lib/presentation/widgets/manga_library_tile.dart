@@ -1,6 +1,10 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
+import 'package:manga_offline/presentation/widgets/cover_image_overrides.dart';
 
 /// A compact card used in the library list to present a single [Manga].
 ///
@@ -47,7 +51,10 @@ class MangaLibraryTile extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              _CoverThumbnail(imageUrl: manga.coverImageUrl),
+              _CoverThumbnail(
+                imagePath: manga.coverImagePath,
+                imageUrl: manga.coverImageUrl,
+              ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -147,23 +154,37 @@ class MangaLibraryTile extends StatelessWidget {
 }
 
 class _CoverThumbnail extends StatelessWidget {
-  const _CoverThumbnail({this.imageUrl});
+  const _CoverThumbnail({this.imagePath, this.imageUrl});
 
   static const double _coverAspectRatio = 3 / 4;
   static const double _coverWidth = 96;
   static const double _coverHeight = _coverWidth / _coverAspectRatio;
 
+  final String? imagePath;
   final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
     // Debug marker to verify thumbnail build on device.
     // Remove after debugging.
-    debugPrint('COVER_THUMBNAIL: build() v2 imageUrl=${imageUrl ?? '<null>'}');
+    debugPrint(
+      'COVER_THUMBNAIL: build() v3 path=${imagePath ?? '<null>'} url=${imageUrl ?? '<null>'}',
+    );
     final theme = Theme.of(context);
 
     Widget child;
-    if (imageUrl != null && imageUrl!.isNotEmpty) {
+    if (_canUseLocalImage(imagePath)) {
+      final override = debugLocalCoverBuilderOverride;
+      if (override != null) {
+        child = override(context, imagePath!);
+      } else {
+        child = Image.file(
+          File(imagePath!),
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _PlaceholderIcon(theme: theme),
+        );
+      }
+    } else if (imageUrl != null && imageUrl!.isNotEmpty) {
       child = Image.network(
         imageUrl!,
         fit: BoxFit.cover,
@@ -195,6 +216,13 @@ class _CoverThumbnail extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  bool _canUseLocalImage(String? path) {
+    if (path == null || path.isEmpty || kIsWeb) {
+      return false;
+    }
+    return File(path).existsSync();
   }
 }
 
