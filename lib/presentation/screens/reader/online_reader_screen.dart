@@ -161,6 +161,7 @@ class _OnlineReaderScreenState extends State<OnlineReaderScreen> {
     return PageView.builder(
       controller: _pageController,
       scrollDirection: Axis.horizontal,
+      padEnds: false,
       onPageChanged: _emitProgress,
       itemCount: _pages.length,
       itemBuilder: (BuildContext context, int index) {
@@ -182,15 +183,12 @@ class _OnlineReaderScreenState extends State<OnlineReaderScreen> {
       onNotification: _handleScrollNotification,
       child: ListView.builder(
         controller: _verticalController,
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        padding: EdgeInsets.zero,
         itemCount: _pages.length,
         itemBuilder: (BuildContext context, int index) {
           final page = _pages[index];
           return Container(
             key: _pageKeys[index],
-            margin: EdgeInsets.only(
-              bottom: index == _pages.length - 1 ? 32 : 16,
-            ),
             child: _NetworkPageImage(
               page: page,
               enablePan: false,

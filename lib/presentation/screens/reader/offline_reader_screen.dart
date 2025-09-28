@@ -144,6 +144,7 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
     return PageView.builder(
       controller: _controller,
       scrollDirection: Axis.horizontal,
+      padEnds: false,
       onPageChanged: _emitProgress,
       itemCount: _paths.length,
       itemBuilder: (BuildContext context, int index) {
@@ -161,15 +162,12 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
       onNotification: _handleScrollNotification,
       child: ListView.builder(
         controller: _verticalController,
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        padding: EdgeInsets.zero,
         itemCount: _paths.length,
         itemBuilder: (BuildContext context, int index) {
           final path = _paths[index];
           return Container(
             key: _pageKeys[index],
-            margin: EdgeInsets.only(
-              bottom: index == _paths.length - 1 ? 32 : 16,
-            ),
             child: _PageImageView(
               path: path,
               enablePan: false,
