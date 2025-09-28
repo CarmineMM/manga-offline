@@ -3,7 +3,7 @@ import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
 
 /// Visual tile for presenting a chapter and its download status.
-class ChapterListTile extends StatelessWidget {
+class ChapterListTile extends StatefulWidget {
   /// Creates a new [ChapterListTile].
   const ChapterListTile({
     super.key,
@@ -11,6 +11,7 @@ class ChapterListTile extends StatelessWidget {
     this.onDownload,
     this.onReadOnline,
     this.onReadOffline,
+    this.onReadStatusChanged,
   });
 
   /// Chapter information rendered by the tile.
@@ -25,8 +26,35 @@ class ChapterListTile extends StatelessWidget {
   /// Callback triggered when the user wants to read offline.
   final void Function(Chapter chapter)? onReadOffline;
 
+  /// Callback triggered when the user toggles the read status.
+  final void Function(Chapter chapter, bool markAsRead)? onReadStatusChanged;
+
+  @override
+  State<ChapterListTile> createState() => _ChapterListTileState();
+}
+
+class _ChapterListTileState extends State<ChapterListTile> {
+  bool _isDownloadRequested = false;
+
+  @override
+  void didUpdateWidget(covariant ChapterListTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.chapter.id != oldWidget.chapter.id) {
+      _isDownloadRequested = false;
+      return;
+    }
+    if (_isDownloadRequested) {
+      final status = widget.chapter.status;
+      if (status != DownloadStatus.notDownloaded &&
+          status != DownloadStatus.failed) {
+        _isDownloadRequested = false;
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final chapter = widget.chapter;
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
 
@@ -36,6 +64,14 @@ class ChapterListTile extends StatelessWidget {
     } else {
       progress = null;
     }
+
+    final isRead =
+        chapter.lastReadAt != null || (chapter.lastReadPage ?? 0) > 0;
+    final readTooltip = isRead ? 'Marcar como no leído' : 'Marcar como leído';
+    final isDownloadLoading =
+        _isDownloadRequested &&
+        (chapter.status == DownloadStatus.notDownloaded ||
+            chapter.status == DownloadStatus.failed);
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -73,6 +109,15 @@ class ChapterListTile extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
+                _ReadToggle(
+                  isRead: isRead,
+                  tooltip: readTooltip,
+                  onChanged: widget.onReadStatusChanged != null
+                      ? (bool value) =>
+                            widget.onReadStatusChanged!(chapter, value)
+                      : null,
+                ),
               ],
             ),
             if (progress != null)
@@ -94,9 +139,15 @@ class ChapterListTile extends StatelessWidget {
               padding: const EdgeInsets.only(top: 12),
               child: _ChapterActions(
                 chapter: chapter,
-                onDownload: onDownload,
-                onReadOnline: onReadOnline,
-                onReadOffline: onReadOffline,
+                onRequestDownload: widget.onDownload != null
+                    ? () {
+                        setState(() => _isDownloadRequested = true);
+                        widget.onDownload!(chapter);
+                      }
+                    : null,
+                onReadOnline: widget.onReadOnline,
+                onReadOffline: widget.onReadOffline,
+                isDownloadLoading: isDownloadLoading,
               ),
             ),
           ],
@@ -138,18 +189,65 @@ class _StatusLabel extends StatelessWidget {
   }
 }
 
+class _ReadToggle extends StatelessWidget {
+  const _ReadToggle({
+    required this.isRead,
+    required this.tooltip,
+    this.onChanged,
+  });
+
+  final bool isRead;
+  final String tooltip;
+  final void Function(bool value)? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final labelStyle = theme.textTheme.labelMedium?.copyWith(
+      color: isRead
+          ? theme.colorScheme.primary
+          : theme.colorScheme.onSurfaceVariant,
+      fontWeight: isRead ? FontWeight.w600 : FontWeight.w500,
+    );
+
+    return Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 400),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (isRead) ...<Widget>[
+            Text('Leído', style: labelStyle),
+            const SizedBox(width: 8),
+          ],
+          Checkbox(
+            value: isRead,
+            onChanged: onChanged != null
+                ? (bool? value) => onChanged!(value ?? false)
+                : null,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ChapterActions extends StatelessWidget {
   const _ChapterActions({
     required this.chapter,
-    this.onDownload,
+    this.onRequestDownload,
     this.onReadOnline,
     this.onReadOffline,
+    this.isDownloadLoading = false,
   });
 
   final Chapter chapter;
-  final void Function(Chapter chapter)? onDownload;
+  final VoidCallback? onRequestDownload;
   final void Function(Chapter chapter)? onReadOnline;
   final void Function(Chapter chapter)? onReadOffline;
+  final bool isDownloadLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -159,6 +257,7 @@ class _ChapterActions extends StatelessWidget {
         return _buildPendingActions(
           context,
           isRetry: chapter.status == DownloadStatus.failed,
+          isLoading: isDownloadLoading,
         );
       case DownloadStatus.queued:
         return Align(
@@ -192,7 +291,11 @@ class _ChapterActions extends StatelessWidget {
     }
   }
 
-  Widget _buildPendingActions(BuildContext context, {required bool isRetry}) {
+  Widget _buildPendingActions(
+    BuildContext context, {
+    required bool isRetry,
+    required bool isLoading,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: <Widget>[
@@ -207,13 +310,20 @@ class _ChapterActions extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         FilledButton(
-          onPressed: onDownload != null
-              ? () => onDownload!(chapter)
-              : () => _showPendingMessage(
-                  context,
-                  'Estamos preparando el gestor de descargas.',
-                ),
-          child: Text(isRetry ? 'Reintentar descarga' : 'Descargar'),
+          onPressed: isLoading
+              ? null
+              : onRequestDownload ??
+                    () => _showPendingMessage(
+                      context,
+                      'Estamos preparando el gestor de descargas.',
+                    ),
+          child: isLoading
+              ? const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(isRetry ? 'Reintentar descarga' : 'Descargar'),
         ),
       ],
     );

@@ -70,20 +70,75 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
   Future<void> _subscribeToMangaUpdates(String mangaId) async {
     await _librarySubscription?.cancel();
     _librarySubscription = _watchDownloadedMangas().listen((mangas) {
-      final updated = _findManga(mangas, mangaId);
-      if (updated != null && state.manga != updated) {
-        emit(
-          state.copyWith(
-            manga: updated,
-            visibleChapters: _composeVisibleChapters(
-              updated.chapters,
-              sortOrder: state.sortOrder,
-              filter: state.filter,
-            ),
-          ),
-        );
-      }
+      unawaited(_handleLibraryUpdate(mangas, mangaId));
     });
+  }
+
+  Future<void> _handleLibraryUpdate(List<Manga> mangas, String mangaId) async {
+    final updated = _findManga(mangas, mangaId);
+    if (updated == null) {
+      return;
+    }
+    final hydrated = await _mergeProgress(updated);
+    if (!_shouldEmitUpdatedManga(hydrated)) {
+      return;
+    }
+    emit(
+      state.copyWith(
+        manga: hydrated,
+        visibleChapters: _composeVisibleChapters(
+          hydrated.chapters,
+          sortOrder: state.sortOrder,
+          filter: state.filter,
+        ),
+      ),
+    );
+  }
+
+  bool _shouldEmitUpdatedManga(Manga next) {
+    final current = state.manga;
+    if (current == null) {
+      return true;
+    }
+    if (!identical(current, next) &&
+        (current.downloadedChapters != next.downloadedChapters ||
+            current.status != next.status ||
+            !_chaptersEquivalent(current.chapters, next.chapters))) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _chaptersEquivalent(List<Chapter> a, List<Chapter> b) {
+    if (identical(a, b)) {
+      return true;
+    }
+    if (a.length != b.length) {
+      return false;
+    }
+    for (var i = 0; i < a.length; i++) {
+      final current = a[i];
+      final next = b[i];
+      if (current.id != next.id ||
+          current.status != next.status ||
+          current.downloadedPages != next.downloadedPages ||
+          current.totalPages != next.totalPages ||
+          current.lastReadPage != next.lastReadPage ||
+          !_dateEquals(current.lastReadAt, next.lastReadAt)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _dateEquals(DateTime? a, DateTime? b) {
+    if (a == null && b == null) {
+      return true;
+    }
+    if (a == null || b == null) {
+      return false;
+    }
+    return a.millisecondsSinceEpoch == b.millisecondsSinceEpoch;
   }
 
   Manga? _findManga(List<Manga> mangas, String mangaId) {
@@ -136,28 +191,98 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
       }
     }
     if (changed) {
-      final updatedManga = current.copyWith(chapters: updatedChapters);
-      emit(
-        state.copyWith(
-          manga: updatedManga,
-          visibleChapters: _composeVisibleChapters(
-            updatedChapters,
-            sortOrder: state.sortOrder,
-            filter: state.filter,
-          ),
-        ),
-      );
+      _emitChapters(updatedChapters);
       // Persist the new page asynchronously (fire-and-forget)
       unawaited(
         _readingProgressDataSource.upsertProgress(
-          sourceId: updatedManga.sourceId,
-          mangaId: updatedManga.id,
+          sourceId: current.sourceId,
+          mangaId: current.id,
           chapterId: chapterId,
           lastReadPage: updatedChapters
               .firstWhere((c) => c.id == chapterId)
               .lastReadPage!,
         ),
       );
+    }
+  }
+
+  void markChapterAsRead(String chapterId, {bool complete = false}) {
+    final current = state.manga;
+    if (current == null) return;
+    final chapters = List<Chapter>.from(current.chapters);
+    final index = chapters.indexWhere((c) => c.id == chapterId);
+    if (index == -1) {
+      return;
+    }
+
+    final chapter = chapters[index];
+    final now = DateTime.now();
+    final computedPage = () {
+      if (complete) {
+        if (chapter.totalPages > 0) {
+          return chapter.totalPages;
+        }
+        if (chapter.pages.isNotEmpty) {
+          return chapter.pages.length;
+        }
+        if (chapter.downloadedPages > 0) {
+          return chapter.downloadedPages;
+        }
+      }
+      final existing = chapter.lastReadPage ?? 0;
+      return existing > 0 ? existing : 1;
+    }();
+    final updated = chapter.copyWith(
+      lastReadAt: now,
+      lastReadPage: computedPage,
+    );
+
+    chapters[index] = updated;
+    _emitChapters(chapters);
+
+    final pageToPersist = updated.lastReadPage ?? computedPage;
+    unawaited(
+      _readingProgressDataSource.upsertProgress(
+        sourceId: current.sourceId,
+        mangaId: current.id,
+        chapterId: chapterId,
+        lastReadPage: pageToPersist <= 0 ? 1 : pageToPersist,
+      ),
+    );
+  }
+
+  void markChapterAsUnread(String chapterId) {
+    final current = state.manga;
+    if (current == null) return;
+    final chapters = List<Chapter>.from(current.chapters);
+    final index = chapters.indexWhere((c) => c.id == chapterId);
+    if (index == -1) {
+      return;
+    }
+
+    final chapter = chapters[index];
+    if (chapter.lastReadAt == null && chapter.lastReadPage == null) {
+      return;
+    }
+
+    chapters[index] = chapter.copyWith(lastReadAt: null, lastReadPage: null);
+    _emitChapters(chapters);
+
+    unawaited(_readingProgressDataSource.deleteProgress(chapterId));
+  }
+
+  void toggleChapterReadStatus(String chapterId) {
+    final current = state.manga;
+    if (current == null) return;
+    final index = current.chapters.indexWhere((c) => c.id == chapterId);
+    if (index == -1) {
+      return;
+    }
+    final chapter = current.chapters[index];
+    if (chapter.lastReadAt != null || (chapter.lastReadPage ?? 0) > 0) {
+      markChapterAsUnread(chapterId);
+    } else {
+      markChapterAsRead(chapterId, complete: true);
     }
   }
 
@@ -258,6 +383,22 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
       return sorted.reversed.toList(growable: false);
     }
     return sorted;
+  }
+
+  void _emitChapters(List<Chapter> updatedChapters) {
+    final current = state.manga;
+    if (current == null) return;
+    final updatedManga = current.copyWith(chapters: updatedChapters);
+    emit(
+      state.copyWith(
+        manga: updatedManga,
+        visibleChapters: _composeVisibleChapters(
+          updatedChapters,
+          sortOrder: state.sortOrder,
+          filter: state.filter,
+        ),
+      ),
+    );
   }
 
   @override

@@ -176,6 +176,7 @@ class _ChapterListBody extends StatelessWidget {
                 );
               },
               onReadOnline: (Chapter selected) {
+                detailCubit.markChapterAsRead(selected.id);
                 Navigator.of(context).push(
                   buildChapterReaderRoute(
                     chapter: selected,
@@ -193,6 +194,7 @@ class _ChapterListBody extends StatelessWidget {
               },
               onReadOffline: (Chapter selected) {
                 if (selected.status == DownloadStatus.downloaded) {
+                  detailCubit.markChapterAsRead(selected.id);
                   Navigator.of(context).push(
                     buildChapterReaderRoute(
                       chapter: selected,
@@ -212,6 +214,15 @@ class _ChapterListBody extends StatelessWidget {
                     context,
                     'Preparando el lector offline para ${selected.title}.',
                   );
+                }
+              },
+              onReadStatusChanged: (Chapter selected, bool markAsRead) {
+                if (markAsRead) {
+                  detailCubit.markChapterAsRead(selected.id, complete: true);
+                  _showMessage(context, 'Capítulo marcado como leído.');
+                } else {
+                  detailCubit.markChapterAsUnread(selected.id);
+                  _showMessage(context, 'Capítulo marcado como no leído.');
                 }
               },
             ),

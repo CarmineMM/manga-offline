@@ -1,6 +1,8 @@
 import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/page_image.dart';
 
+const Object _unset = Object();
+
 /// Domain entity describing a manga chapter and its offline status.
 class Chapter {
   /// Unique identifier for the chapter across sources.
@@ -81,8 +83,8 @@ class Chapter {
     int? totalPages,
     int? downloadedPages,
     DateTime? releaseDate,
-    DateTime? lastReadAt,
-    int? lastReadPage,
+    Object? lastReadAt = _unset,
+    Object? lastReadPage = _unset,
     List<PageImage>? pages,
   }) {
     return Chapter(
@@ -98,8 +100,12 @@ class Chapter {
       totalPages: totalPages ?? this.totalPages,
       downloadedPages: downloadedPages ?? this.downloadedPages,
       releaseDate: releaseDate ?? this.releaseDate,
-      lastReadAt: lastReadAt ?? this.lastReadAt,
-      lastReadPage: lastReadPage ?? this.lastReadPage,
+      lastReadAt: identical(lastReadAt, _unset)
+          ? this.lastReadAt
+          : lastReadAt as DateTime?,
+      lastReadPage: identical(lastReadPage, _unset)
+          ? this.lastReadPage
+          : lastReadPage as int?,
       pages: pages ?? this.pages,
     );
   }

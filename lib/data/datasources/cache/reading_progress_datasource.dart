@@ -92,4 +92,21 @@ class ReadingProgressDataSource {
         .toList(growable: false);
     return Future<List<ReadingProgressEntity>>.value(result);
   }
+
+  Future<void> deleteProgress(String chapterId) async {
+    final isar = _isar;
+    if (isar != null) {
+      await isar.writeTxn(() async {
+        final existing = await isar.readingProgressEntitys
+            .filter()
+            .chapterIdEqualTo(chapterId)
+            .findFirst();
+        if (existing != null) {
+          await isar.readingProgressEntitys.delete(existing.id);
+        }
+      });
+      return;
+    }
+    _memoryStore?.remove(chapterId);
+  }
 }

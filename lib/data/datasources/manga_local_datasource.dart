@@ -148,26 +148,43 @@ class MangaLocalDataSource {
 
   /// Watches the collection for changes and emits the current list of mangas.
   Stream<List<MangaModel>> watchMangas() {
-    late StreamSubscription<void> subscription;
+    StreamSubscription<void>? mangaSubscription;
+    StreamSubscription<void>? chapterSubscription;
+    var isClosed = false;
     final controller = StreamController<List<MangaModel>>.broadcast();
 
     Future<void> emitSnapshot() async {
+      if (isClosed || controller.isClosed) {
+        return;
+      }
       final mangas = await getAllMangas();
-      controller.add(mangas);
+      if (!controller.isClosed) {
+        controller.add(mangas);
+      }
+    }
+
+    void scheduleSnapshot([_]) {
+      unawaited(emitSnapshot());
     }
 
     void start() {
-      subscription = _mangaCollection.watchLazy(fireImmediately: false).listen((
-        _,
-      ) {
-        emitSnapshot();
-      });
-      emitSnapshot();
+      mangaSubscription = _mangaCollection
+          .watchLazy(fireImmediately: false)
+          .listen(scheduleSnapshot, onError: controller.addError);
+      chapterSubscription = _chapterCollection
+          .watchLazy(fireImmediately: false)
+          .listen(scheduleSnapshot, onError: controller.addError);
+      scheduleSnapshot();
     }
 
     controller.onListen = start;
     controller.onCancel = () async {
-      await subscription.cancel();
+      if (controller.hasListener) {
+        return;
+      }
+      isClosed = true;
+      await mangaSubscription?.cancel();
+      await chapterSubscription?.cancel();
     };
 
     return controller.stream;
