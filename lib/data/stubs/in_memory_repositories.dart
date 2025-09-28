@@ -7,12 +7,12 @@ import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
 import 'package:manga_offline/domain/entities/manga_source.dart';
 import 'package:manga_offline/domain/entities/page_image.dart';
-import 'package:manga_offline/domain/entities/source_capability.dart';
 import 'package:manga_offline/domain/repositories/catalog_repository.dart';
 import 'package:manga_offline/data/datasources/catalog_remote_datasource.dart';
 import 'package:manga_offline/domain/repositories/manga_repository.dart';
 import 'package:manga_offline/domain/repositories/source_repository.dart';
 import 'package:manga_offline/data/datasources/cache/page_cache_datasource.dart';
+import 'package:manga_offline/data/constants/default_sources.dart';
 
 /// In-memory implementation of [MangaRepository].
 ///
@@ -486,13 +486,7 @@ class InMemorySourceRepository implements SourceRepository {
   final StreamController<List<MangaSource>> _controller =
       StreamController<List<MangaSource>>.broadcast();
   final Map<String, MangaSource> _sources = <String, MangaSource>{
-    'olympus': const MangaSource(
-      id: 'olympus',
-      name: 'Olympus Biblioteca',
-      baseUrl: 'https://olympusbiblioteca.com',
-      locale: 'es-ES',
-      capabilities: [SourceCapability.catalog, SourceCapability.detail],
-    ),
+    for (final source in kDefaultSources) source.id: source,
   };
 
   void _emit() {

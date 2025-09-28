@@ -1,16 +1,25 @@
-import 'package:get_it/get_it.dart';
 import 'dart:io';
+
+import 'package:get_it/get_it.dart';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:manga_offline/data/datasources/cache/page_cache_datasource.dart';
-import 'package:manga_offline/data/datasources/cache/reading_progress_datasource.dart';
 import 'package:manga_offline/core/debug/debug_logger.dart';
 import 'package:manga_offline/core/utils/reader_preferences.dart';
 import 'package:manga_offline/core/utils/source_preferences.dart';
-
-import 'package:manga_offline/data/repositories/download_repository_impl.dart';
-import 'package:manga_offline/data/stubs/in_memory_repositories.dart';
+import 'package:manga_offline/data/datasources/cache/page_cache_datasource.dart';
+import 'package:manga_offline/data/datasources/cache/reading_progress_datasource.dart';
+import 'package:manga_offline/data/datasources/manga_local_datasource.dart';
 import 'package:manga_offline/data/datasources/olympus_remote_datasource.dart';
+import 'package:manga_offline/data/datasources/source_local_datasource.dart';
+import 'package:manga_offline/data/models/chapter_model.dart';
+import 'package:manga_offline/data/models/manga_model.dart';
+import 'package:manga_offline/data/models/page_image_model.dart';
+import 'package:manga_offline/data/models/manga_source_model.dart';
+import 'package:manga_offline/data/repositories/catalog_repository_impl.dart';
+import 'package:manga_offline/data/repositories/download_repository_impl.dart';
+import 'package:manga_offline/data/repositories/manga_repository_impl.dart';
+import 'package:manga_offline/data/repositories/source_repository_impl.dart';
+import 'package:manga_offline/data/stubs/in_memory_repositories.dart';
 import 'package:manga_offline/domain/repositories/catalog_repository.dart';
 import 'package:manga_offline/domain/repositories/download_repository.dart';
 import 'package:manga_offline/domain/repositories/manga_repository.dart';
@@ -37,68 +46,90 @@ final GetIt serviceLocator = GetIt.instance;
 
 /// Registers shared dependencies for the application.
 ///
-/// The function wires development-friendly implementations (in-memory
-/// repositories and a `DownloadRepositoryImpl` writing to a temporary
-/// directory). Call this early from `main()` in debug/development builds.
+/// The function wires persistent implementations backed by Isar whenever
+/// available, with in-memory fallbacks to keep the app usable in environments
+/// where local storage is not accessible (for example, widget tests).
 Future<void> configureDependencies() async {
   if (serviceLocator.isRegistered<MangaRepository>()) {
+    final existingIsar = Isar.getInstance('manga_offline');
+    if (existingIsar != null && existingIsar.isOpen) {
+      await existingIsar.close();
+    }
     await serviceLocator.reset();
   }
 
   final debugLogger = DebugLogger();
 
-  // Inicializa Isar (persistencia local). Añadimos PageEntity para cache de páginas.
-  final appDir = await getApplicationDocumentsDirectory();
-  // Nota: PageEntitySchema se genera vía build_runner. Asegúrate de ejecutar
-  // `flutter pub run build_runner build --delete-conflicting-outputs`
-  // después de este cambio para evitar errores de símbolo no definido.
+  final Directory appDir = await getApplicationDocumentsDirectory();
   Isar? isar;
   try {
-    isar = await Isar.open(
-      [PageEntitySchema, ReadingProgressEntitySchema],
-      directory: appDir.path,
-      inspector: false,
-    );
-  } catch (e) {
+    isar =
+        Isar.getInstance('manga_offline') ??
+        await Isar.open(
+          <CollectionSchema<dynamic>>[
+            MangaModelSchema,
+            ChapterModelSchema,
+            PageImageModelSchema,
+            MangaSourceModelSchema,
+            PageEntitySchema,
+            ReadingProgressEntitySchema,
+          ],
+          directory: appDir.path,
+          name: 'manga_offline',
+          inspector: false,
+        );
+  } catch (_) {
     isar = null;
   }
+
   late final PageCacheDataSource pageCache;
   late final ReadingProgressDataSource readingProgressDs;
+  late final MangaRepository mangaRepository;
+  late final CatalogRepository catalogRepository;
+  late final SourceRepository sourceRepository;
+
+  final olympusRemote = OlympusRemoteDataSource(debugLogger: debugLogger);
+  final readerPrefs = await ReaderPreferences.create();
+  final sourcePrefs = await SourcePreferences.create();
+
   if (isar != null) {
-    final Isar isarInstance = isar;
-    pageCache = IsarPageCacheDataSource(isarInstance);
-    readingProgressDs = ReadingProgressDataSource(isarInstance);
+    pageCache = IsarPageCacheDataSource(isar);
+    readingProgressDs = ReadingProgressDataSource(isar);
+    final localDataSource = MangaLocalDataSource(isar);
+    final sourceLocalDataSource = SourceLocalDataSource(isar);
+    mangaRepository = MangaRepositoryImpl(localDataSource: localDataSource);
+    catalogRepository = CatalogRepositoryImpl(
+      localDataSource: localDataSource,
+      remoteDataSources: {olympusRemote.sourceId: olympusRemote},
+    );
+    sourceRepository = SourceRepositoryImpl(
+      localDataSource: sourceLocalDataSource,
+      sourcePreferences: sourcePrefs,
+    );
   } else {
     pageCache = InMemoryPageCacheDataSource();
     readingProgressDs = ReadingProgressDataSource.inMemory();
+    final fallbackMangaRepository = InMemoryMangaRepository();
+    mangaRepository = fallbackMangaRepository;
+    catalogRepository = InMemoryCatalogRepository(
+      fallbackMangaRepository,
+      remoteDataSources: {olympusRemote.sourceId: olympusRemote},
+      pageCache: pageCache,
+    );
+    sourceRepository = InMemorySourceRepository(sourcePreferences: sourcePrefs);
   }
 
-  final inMemoryMangaRepository = InMemoryMangaRepository();
-  final olympusRemote = OlympusRemoteDataSource(debugLogger: debugLogger);
-  final inMemoryCatalogRepository = InMemoryCatalogRepository(
-    inMemoryMangaRepository,
-    remoteDataSources: {olympusRemote.sourceId: olympusRemote},
-  );
-  final tempDownloadsDir = await Directory.systemTemp.createTemp(
-    'manga_offline_downloads',
-  );
   final downloadRepository = DownloadRepositoryImpl(
-    catalogRepository: inMemoryCatalogRepository,
-    mangaRepository: inMemoryMangaRepository,
-    documentsDirectoryProvider: () async => tempDownloadsDir,
-  );
-
-  final readerPrefs = await ReaderPreferences.create();
-  final sourcePrefs = await SourcePreferences.create();
-  final inMemorySourceRepository = InMemorySourceRepository(
-    sourcePreferences: sourcePrefs,
+    catalogRepository: catalogRepository,
+    mangaRepository: mangaRepository,
+    documentsDirectoryProvider: () async => appDir,
   );
 
   serviceLocator
     ..registerSingleton<DebugLogger>(debugLogger)
-    ..registerSingleton<MangaRepository>(inMemoryMangaRepository)
-    ..registerSingleton<CatalogRepository>(inMemoryCatalogRepository)
-    ..registerSingleton<SourceRepository>(inMemorySourceRepository)
+    ..registerSingleton<MangaRepository>(mangaRepository)
+    ..registerSingleton<CatalogRepository>(catalogRepository)
+    ..registerSingleton<SourceRepository>(sourceRepository)
     ..registerSingleton<DownloadRepository>(downloadRepository)
     ..registerSingleton<PageCacheDataSource>(pageCache)
     ..registerSingleton<ReadingProgressDataSource>(readingProgressDs)
