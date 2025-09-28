@@ -193,20 +193,16 @@ class _ChapterActions extends StatelessWidget {
   }
 
   Widget _buildPendingActions(BuildContext context, {required bool isRetry}) {
-    final canReadOnline = chapter.remoteUrl?.isNotEmpty == true;
-
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: <Widget>[
         TextButton(
-          onPressed: canReadOnline
-              ? (onReadOnline != null
-                    ? () => onReadOnline!(chapter)
-                    : () => _showPendingMessage(
-                        context,
-                        'Abriremos la lectura en línea en una versión futura.',
-                      ))
-              : null,
+          onPressed: onReadOnline != null
+              ? () => onReadOnline!(chapter)
+              : () => _showPendingMessage(
+                  context,
+                  'Conéctate a Internet para leer este capítulo en línea.',
+                ),
           child: const Text('Leer en línea'),
         ),
         const SizedBox(width: 8),
