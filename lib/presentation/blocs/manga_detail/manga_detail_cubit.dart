@@ -42,11 +42,13 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
       );
       // Merge persisted reading progress
       final hydrated = await _mergeProgress(manga);
+      final sorted = _applySorting(hydrated.chapters, state.sortOrder);
       emit(
         state.copyWith(
           status: MangaDetailStatus.success,
           manga: hydrated,
           errorMessage: null,
+          visibleChapters: sorted,
         ),
       );
       await _subscribeToMangaUpdates(mangaId);
@@ -65,7 +67,12 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
     _librarySubscription = _watchDownloadedMangas().listen((mangas) {
       final updated = _findManga(mangas, mangaId);
       if (updated != null && state.manga != updated) {
-        emit(state.copyWith(manga: updated));
+        emit(
+          state.copyWith(
+            manga: updated,
+            visibleChapters: _applySorting(updated.chapters, state.sortOrder),
+          ),
+        );
       }
     });
   }
@@ -121,7 +128,12 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
     }
     if (changed) {
       final updatedManga = current.copyWith(chapters: updatedChapters);
-      emit(state.copyWith(manga: updatedManga));
+      emit(
+        state.copyWith(
+          manga: updatedManga,
+          visibleChapters: _applySorting(updatedChapters, state.sortOrder),
+        ),
+      );
       // Persist the new page asynchronously (fire-and-forget)
       unawaited(
         _readingProgressDataSource.upsertProgress(
@@ -156,6 +168,32 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
     } catch (_) {
       return manga; // Fail silent; we can log later.
     }
+  }
+
+  /// Toggles between ascending and descending chapter order.
+  void toggleChapterOrder() {
+    final nextOrder = state.sortOrder == ChapterSortOrder.ascending
+        ? ChapterSortOrder.descending
+        : ChapterSortOrder.ascending;
+    final chapters = state.manga?.chapters ?? const <Chapter>[];
+    emit(
+      state.copyWith(
+        sortOrder: nextOrder,
+        visibleChapters: _applySorting(chapters, nextOrder),
+      ),
+    );
+  }
+
+  List<Chapter> _applySorting(List<Chapter> chapters, ChapterSortOrder order) {
+    if (chapters.isEmpty) {
+      return const <Chapter>[];
+    }
+    final sorted = List<Chapter>.from(chapters);
+    sorted.sort((a, b) => a.number.compareTo(b.number));
+    if (order == ChapterSortOrder.descending) {
+      return sorted.reversed.toList(growable: false);
+    }
+    return sorted;
   }
 
   @override

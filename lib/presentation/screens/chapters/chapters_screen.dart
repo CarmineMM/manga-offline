@@ -49,10 +49,29 @@ class _ChapterListView extends StatelessWidget {
       },
       builder: (BuildContext context, MangaDetailState state) {
         final manga = state.manga ?? initialManga;
-        final chapters = state.manga?.chapters ?? initialManga.chapters;
+        final loaded = state.status == MangaDetailStatus.success;
+        final chapters = loaded ? state.visibleChapters : initialManga.chapters;
+        final canToggleOrder = loaded && (state.visibleChapters.length > 1);
 
         return Scaffold(
-          appBar: AppBar(title: Text(manga.title)),
+          appBar: AppBar(
+            title: Text(manga.title),
+            actions: [
+              if (canToggleOrder)
+                IconButton(
+                  icon: Icon(
+                    state.sortOrder == ChapterSortOrder.ascending
+                        ? Icons.arrow_downward
+                        : Icons.arrow_upward,
+                  ),
+                  tooltip: state.sortOrder == ChapterSortOrder.ascending
+                      ? 'Ordenar descendente'
+                      : 'Ordenar ascendente',
+                  onPressed: () =>
+                      context.read<MangaDetailCubit>().toggleChapterOrder(),
+                ),
+            ],
+          ),
           body: _ChapterListBody(
             manga: manga,
             chapters: chapters,
