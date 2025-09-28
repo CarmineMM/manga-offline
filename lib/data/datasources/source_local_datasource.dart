@@ -58,6 +58,16 @@ class SourceLocalDataSource {
     await putSource(model);
   }
 
+  /// Updates the last synchronization timestamp for a source.
+  Future<void> setLastSyncedAt(String sourceId, DateTime? timestamp) async {
+    final model = await getById(sourceId);
+    if (model == null) {
+      return;
+    }
+    model.lastSyncedAt = timestamp;
+    await putSource(model);
+  }
+
   /// Synchronises stored enable flags with the provided [enabledIds].
   Future<void> applyEnabledFlags(Set<String> enabledIds) async {
     final all = await getAll();

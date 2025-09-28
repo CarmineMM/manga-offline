@@ -23,7 +23,7 @@ void main() {
     sourcePreferences = await SourcePreferences.create();
     repository = SourceRepositoryImpl(
       localDataSource: localDataSource,
-      sourcePreferences: sourcePreferences,
+      legacyPreferences: sourcePreferences,
     );
   });
 
@@ -59,7 +59,7 @@ void main() {
     final newPreferences = await SourcePreferences.create();
     repository = SourceRepositoryImpl(
       localDataSource: localDataSource,
-      sourcePreferences: newPreferences,
+      legacyPreferences: newPreferences,
     );
 
     final reloaded = await repository.loadSources();
@@ -151,6 +151,17 @@ class FakeSourceLocalDataSource implements SourceLocalDataSource {
     return existing == null ? null : _clone(existing);
   }
 
+  @override
+  Future<void> setLastSyncedAt(String sourceId, DateTime? timestamp) async {
+    final existing = _storage[sourceId];
+    if (existing == null) {
+      return;
+    }
+    existing.lastSyncedAt = timestamp;
+    _storage[sourceId] = _clone(existing);
+    _emit();
+  }
+
   Future<void> dispose() async {
     await _controller.close();
   }
@@ -176,6 +187,7 @@ class FakeSourceLocalDataSource implements SourceLocalDataSource {
       ..locale = source.locale
       ..iconUrl = source.iconUrl
       ..isEnabled = source.isEnabled
-      ..capabilities = List<String>.from(source.capabilities);
+      ..capabilities = List<String>.from(source.capabilities)
+      ..lastSyncedAt = source.lastSyncedAt;
   }
 }

@@ -26,6 +26,9 @@ class MangaSource {
   /// Capabilities supported by the source (catalog sync, downloads, etc.).
   final List<SourceCapability> capabilities;
 
+  /// Timestamp of the last successful catalog synchronisation.
+  final DateTime? lastSyncedAt;
+
   /// Creates a new immutable [MangaSource] instance.
   const MangaSource({
     required this.id,
@@ -39,6 +42,7 @@ class MangaSource {
       SourceCapability.catalog,
       SourceCapability.detail,
     ],
+    this.lastSyncedAt,
   });
 
   /// Returns a copy of this source with selective overrides.
@@ -51,6 +55,7 @@ class MangaSource {
     String? iconUrl,
     bool? isEnabled,
     List<SourceCapability>? capabilities,
+    DateTime? lastSyncedAt,
   }) {
     return MangaSource(
       id: id ?? this.id,
@@ -61,6 +66,7 @@ class MangaSource {
       iconUrl: iconUrl ?? this.iconUrl,
       isEnabled: isEnabled ?? this.isEnabled,
       capabilities: capabilities ?? this.capabilities,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
     );
   }
 }

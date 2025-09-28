@@ -33,6 +33,8 @@ class _FakeSourceRepository implements SourceRepository {
   final List<MangaSource> _sources;
   String? updatedSource;
   bool? updatedValue;
+  String? syncedSource;
+  DateTime? syncedAt;
 
   @override
   Future<List<MangaSource>> loadSources() async => _sources;
@@ -47,6 +49,20 @@ class _FakeSourceRepository implements SourceRepository {
   }) async {
     updatedSource = sourceId;
     updatedValue = isEnabled;
+  }
+
+  @override
+  Future<void> markSourceSynced({
+    required String sourceId,
+    DateTime? timestamp,
+  }) async {
+    syncedSource = sourceId;
+    syncedAt = timestamp;
+  }
+
+  @override
+  Future<DateTime?> getSourceLastSync(String sourceId) async {
+    return null;
   }
 }
 

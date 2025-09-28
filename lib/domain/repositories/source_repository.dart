@@ -13,4 +13,13 @@ abstract interface class SourceRepository {
     required String sourceId,
     required bool isEnabled,
   });
+
+  /// Stores the last synchronization timestamp for a source.
+  Future<void> markSourceSynced({
+    required String sourceId,
+    DateTime? timestamp,
+  });
+
+  /// Retrieves the last synchronization timestamp for a source, if any.
+  Future<DateTime?> getSourceLastSync(String sourceId);
 }

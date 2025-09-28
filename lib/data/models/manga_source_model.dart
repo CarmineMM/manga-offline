@@ -35,6 +35,9 @@ class MangaSourceModel {
   /// Serialized source capabilities stored as enum names.
   List<String> capabilities = <String>[];
 
+  /// Timestamp of the last successful sync.
+  DateTime? lastSyncedAt;
+
   /// Maps the model to the domain entity representation.
   MangaSource toEntity() {
     final mappedCapabilities = capabilities
@@ -55,6 +58,7 @@ class MangaSourceModel {
       iconUrl: iconUrl,
       isEnabled: isEnabled,
       capabilities: mappedCapabilities,
+      lastSyncedAt: lastSyncedAt,
     );
   }
 
@@ -70,7 +74,8 @@ class MangaSourceModel {
       ..isEnabled = source.isEnabled
       ..capabilities = source.capabilities
           .map((capability) => capability.name)
-          .toList();
+          .toList()
+      ..lastSyncedAt = source.lastSyncedAt;
     return model;
   }
 }

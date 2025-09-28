@@ -12,14 +12,14 @@ class SourceRepositoryImpl implements SourceRepository {
   /// Creates a repository bound to the local data source and preferences.
   SourceRepositoryImpl({
     required SourceLocalDataSource localDataSource,
-    SourcePreferences? sourcePreferences,
+    SourcePreferences? legacyPreferences,
     List<MangaSource> seedSources = kDefaultSources,
   }) : _localDataSource = localDataSource,
-       _sourcePreferences = sourcePreferences,
+       _legacyPreferences = legacyPreferences,
        _seedSources = seedSources;
 
   final SourceLocalDataSource _localDataSource;
-  final SourcePreferences? _sourcePreferences;
+  final SourcePreferences? _legacyPreferences;
   final List<MangaSource> _seedSources;
 
   bool _initialized = false;
@@ -61,7 +61,25 @@ class SourceRepositoryImpl implements SourceRepository {
         MangaSourceModel.fromEntity(seed.copyWith(isEnabled: isEnabled)),
       );
     }
-    await _sourcePreferences?.setEnabled(sourceId, isEnabled);
+  }
+
+  @override
+  Future<void> markSourceSynced({
+    required String sourceId,
+    DateTime? timestamp,
+  }) async {
+    await _ensureInitialized();
+    await _localDataSource.setLastSyncedAt(
+      sourceId,
+      timestamp ?? DateTime.now(),
+    );
+  }
+
+  @override
+  Future<DateTime?> getSourceLastSync(String sourceId) async {
+    await _ensureInitialized();
+    final model = await _localDataSource.getById(sourceId);
+    return model?.lastSyncedAt;
   }
 
   Future<void> _ensureInitialized() async {
@@ -79,12 +97,19 @@ class SourceRepositoryImpl implements SourceRepository {
       final hasAny = await _localDataSource.hasAny();
       if (!hasAny && _seedSources.isNotEmpty) {
         final enabledSet =
-            _sourcePreferences?.enabledSources() ?? const <String>{};
+            _legacyPreferences?.enabledSources() ?? const <String>{};
+        final legacySynced = <String, DateTime?>{};
+        if (_legacyPreferences != null) {
+          for (final source in _seedSources) {
+            legacySynced[source.id] = _legacyPreferences.lastSync(source.id);
+          }
+        }
         final models = _seedSources
             .map(
               (source) => MangaSourceModel.fromEntity(
                 source.copyWith(
                   isEnabled: enabledSet.contains(source.id) || source.isEnabled,
+                  lastSyncedAt: legacySynced[source.id],
                 ),
               ),
             )

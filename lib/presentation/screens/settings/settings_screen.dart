@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:manga_offline/core/di/service_locator.dart';
-import 'package:manga_offline/core/utils/source_preferences.dart';
 import 'package:manga_offline/domain/entities/manga_source.dart';
 import 'package:manga_offline/domain/entities/source_capability.dart';
 import 'package:manga_offline/presentation/blocs/debug/debug_log_cubit.dart';
@@ -119,8 +118,7 @@ class _SourceTile extends StatelessWidget {
         .map(_describeCapability)
         .whereType<String>()
         .join(' · ');
-    final prefs = serviceLocator.get<SourcePreferences>();
-    final lastSync = prefs.lastSync(source.id);
+    final lastSync = source.lastSyncedAt;
     String lastSyncLabel = 'Nunca sincronizado';
     if (lastSync != null) {
       lastSyncLabel =

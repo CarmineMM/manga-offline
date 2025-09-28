@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
-import 'package:manga_offline/core/utils/source_preferences.dart';
 import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
@@ -473,15 +472,18 @@ class InMemoryCatalogRepository implements CatalogRepository {
 /// the selection state used by the UI. This is useful for development where
 /// multiple sources may be simulated without network access.
 class InMemorySourceRepository implements SourceRepository {
-  InMemorySourceRepository({SourcePreferences? sourcePreferences})
-    : _sourcePreferences = sourcePreferences {
-    final enabled = _sourcePreferences?.enabledSources() ?? const <String>{};
+  InMemorySourceRepository({
+    Set<String> initialEnabled = const <String>{},
+    Map<String, DateTime?> initialLastSync = const <String, DateTime?>{},
+  }) {
     _sources.updateAll(
-      (key, value) => value.copyWith(isEnabled: enabled.contains(key)),
+      (key, value) => value.copyWith(
+        isEnabled: initialEnabled.contains(key),
+        lastSyncedAt: initialLastSync[key],
+      ),
     );
     _emit();
   }
-  final SourcePreferences? _sourcePreferences;
 
   final StreamController<List<MangaSource>> _controller =
       StreamController<List<MangaSource>>.broadcast();
@@ -509,8 +511,25 @@ class InMemorySourceRepository implements SourceRepository {
     final existing = _sources[sourceId];
     if (existing == null) return;
     _sources[sourceId] = existing.copyWith(isEnabled: isEnabled);
-    await _sourcePreferences?.setEnabled(sourceId, isEnabled);
     _emit();
+  }
+
+  @override
+  Future<void> markSourceSynced({
+    required String sourceId,
+    DateTime? timestamp,
+  }) async {
+    final existing = _sources[sourceId];
+    if (existing == null) return;
+    _sources[sourceId] = existing.copyWith(
+      lastSyncedAt: timestamp ?? DateTime.now(),
+    );
+    _emit();
+  }
+
+  @override
+  Future<DateTime?> getSourceLastSync(String sourceId) async {
+    return _sources[sourceId]?.lastSyncedAt;
   }
 }
 
