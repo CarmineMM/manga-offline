@@ -11,13 +11,21 @@ import 'package:manga_offline/domain/entities/download_status.dart';
 /// for downloaded chapters and a status chip.
 class MangaLibraryTile extends StatelessWidget {
   /// Creates a new [MangaLibraryTile].
-  const MangaLibraryTile({super.key, required this.manga, this.onTap});
+  const MangaLibraryTile({
+    super.key,
+    required this.manga,
+    this.onTap,
+    this.showDownloadProgressDetails = false,
+  });
 
   /// Manga information to display.
   final Manga manga;
 
   /// Callback triggered when the tile is tapped.
   final VoidCallback? onTap;
+
+  /// Whether to display extended download progress information.
+  final bool showDownloadProgressDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +91,24 @@ class MangaLibraryTile extends StatelessWidget {
                               '${manga.downloadedChapters}/${manga.totalChapters} capítulos listos',
                               style: theme.textTheme.bodySmall,
                             ),
+                            if (showDownloadProgressDetails)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  _remainingChaptersLabel(),
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                              ),
                           ],
+                        ),
+                      )
+                    else if (showDownloadProgressDetails &&
+                        manga.downloadedChapters > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Capítulos descargados: ${manga.downloadedChapters}',
+                          style: theme.textTheme.bodySmall,
                         ),
                       ),
                   ],
@@ -104,6 +129,20 @@ class MangaLibraryTile extends StatelessWidget {
       return 0.0;
     }
     return (manga.downloadedChapters / manga.totalChapters).clamp(0.0, 1.0);
+  }
+
+  String _remainingChaptersLabel() {
+    if (manga.totalChapters <= 0) {
+      return 'Capítulos descargados: ${manga.downloadedChapters}';
+    }
+    final remaining = (manga.totalChapters - manga.downloadedChapters).clamp(
+      0,
+      manga.totalChapters,
+    );
+    if (remaining == 0) {
+      return 'Todos los capítulos están disponibles offline';
+    }
+    return '$remaining capítulos pendientes por descargar';
   }
 }
 

@@ -52,6 +52,7 @@ class DownloadsScreen extends StatelessWidget {
                   final manga = state.downloadedMangas[index];
                   return MangaLibraryTile(
                     manga: manga,
+                    showDownloadProgressDetails: true,
                     onTap: () => _openMangaDetail(context, manga),
                   );
                 },
