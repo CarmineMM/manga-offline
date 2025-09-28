@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:manga_offline/data/datasources/catalog_remote_datasource.dart';
 import 'package:manga_offline/data/datasources/manga_local_datasource.dart';
 import 'package:manga_offline/data/models/chapter_model.dart';
@@ -84,7 +86,6 @@ class CatalogRepositoryImpl implements CatalogRepository {
     required String mangaId,
   }) async {
     final remote = _resolveRemote(sourceId);
-    final remoteChapters = await remote.fetchAllChapters(mangaSlug: mangaId);
     final existingModel = await _localDataSource.getManga(mangaId);
     final existingChapterModels = await _localDataSource.getChaptersForManga(
       mangaId,
@@ -95,6 +96,41 @@ class CatalogRepositoryImpl implements CatalogRepository {
         model.referenceId,
       );
       existingChaptersById[model.referenceId] = model.toEntity(pages: pages);
+    }
+
+    List<RemoteChapterSummary> remoteChapters = const <RemoteChapterSummary>[];
+    Object? remoteError;
+    StackTrace? remoteStackTrace;
+    try {
+      remoteChapters = await remote.fetchAllChapters(mangaSlug: mangaId);
+    } catch (error, stackTrace) {
+      remoteError = error;
+      remoteStackTrace = stackTrace;
+      developer.log(
+        'fetchMangaDetail remote fetch failed for $mangaId from $sourceId',
+        name: 'CatalogRepositoryImpl',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    if (remoteError != null) {
+      if (existingModel != null) {
+        final base = existingModel.toEntity();
+        final cachedChapters = existingChaptersById.values.toList(
+          growable: false,
+        );
+        return base.copyWith(
+          chapters: cachedChapters,
+          totalChapters: base.totalChapters != 0
+              ? base.totalChapters
+              : cachedChapters.length,
+        );
+      }
+      if (remoteStackTrace != null) {
+        Error.throwWithStackTrace(remoteError, remoteStackTrace);
+      }
+      throw remoteError;
     }
 
     if (remoteChapters.isEmpty) {

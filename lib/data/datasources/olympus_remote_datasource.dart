@@ -60,7 +60,22 @@ class OlympusRemoteDataSource implements CatalogRemoteDataSource {
     var nextPage = 1;
 
     while (true) {
-      final page = await _fetchChapterPage(slug: mangaSlug, page: nextPage);
+      _ChapterPage page;
+      try {
+        page = await _fetchChapterPage(slug: mangaSlug, page: nextPage);
+      } catch (error, stackTrace) {
+        developer.log(
+          'fetchAllChapters page=$nextPage stopped for $mangaSlug',
+          name: 'OlympusRemoteDataSource',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        if (chapters.isEmpty) {
+          rethrow;
+        }
+        break;
+      }
+
       chapters.addAll(page.items);
 
       if (page.currentPage >= page.lastPage) {

@@ -299,5 +299,50 @@ void main() {
       expect(result.id, equals('missing'));
       expect(result.chapters, hasLength(1));
     });
+
+    test('falls back to cached chapters when remote request fails', () async {
+      const sourceId = 'olympus';
+      final mangaModel = MangaModel()
+        ..referenceId = 'slug'
+        ..sourceId = sourceId
+        ..title = 'Sample'
+        ..status = DownloadStatus.downloaded
+        ..totalChapters = 1;
+      final chapterModel = ChapterModel()
+        ..referenceId = 'chapter-1'
+        ..mangaReferenceId = 'slug'
+        ..sourceId = sourceId
+        ..title = 'Capítulo 1'
+        ..number = 1
+        ..status = DownloadStatus.downloaded;
+
+      when(() => local.getManga('slug')).thenAnswer((_) async => mangaModel);
+      when(
+        () => local.getChaptersForManga('slug'),
+      ).thenAnswer((_) async => [chapterModel]);
+      when(
+        () => local.getPagesForChapter('chapter-1'),
+      ).thenAnswer((_) async => const <PageImageModel>[]);
+      when(
+        () => remote.fetchAllChapters(mangaSlug: 'slug'),
+      ).thenThrow(Exception('offline'));
+
+      final result = await repository.fetchMangaDetail(
+        sourceId: sourceId,
+        mangaId: 'slug',
+      );
+
+      expect(result.id, equals('slug'));
+      expect(result.chapters, hasLength(1));
+      expect(result.chapters.single.id, equals('chapter-1'));
+      verifyNever(
+        () => local.putManga(
+          any(),
+          chapters: any(named: 'chapters'),
+          pages: any(named: 'pages'),
+          replaceChapters: any(named: 'replaceChapters'),
+        ),
+      );
+    });
   });
 }

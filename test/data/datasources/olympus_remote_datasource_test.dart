@@ -94,6 +94,41 @@ void main() {
     expect(chapters.first.publishedAt, isNotNull);
   });
 
+  test(
+    'fetchAllChapters keeps previous pages when later request fails',
+    () async {
+      final client = MockClient((request) async {
+        final page = int.parse(request.url.queryParameters['page'] ?? '1');
+        if (page == 1) {
+          return http.Response(
+            _chapterPagePayload(
+              currentPage: 1,
+              lastPage: 2,
+              entries: [
+                _chapterEntry(
+                  id: 101,
+                  name: '2',
+                  publishedAt: '2025-01-01T00:00:00Z',
+                ),
+              ],
+            ),
+            200,
+          );
+        }
+        return http.Response('Not Found', 404);
+      });
+
+      final datasource = OlympusRemoteDataSource(httpClient: client);
+
+      final chapters = await datasource.fetchAllChapters(
+        mangaSlug: 'manga-slug',
+      );
+
+      expect(chapters, hasLength(1));
+      expect(chapters.single.externalId, equals('101'));
+    },
+  );
+
   test('fetchAllChapters throws on non-success status codes', () async {
     final client = MockClient((request) async => http.Response('Error', 500));
     final datasource = OlympusRemoteDataSource(httpClient: client);
