@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:isar/isar.dart';
 import 'package:manga_offline/data/models/chapter_model.dart';
@@ -150,16 +151,29 @@ class MangaLocalDataSource {
   Stream<List<MangaModel>> watchMangas() {
     StreamSubscription<void>? mangaSubscription;
     StreamSubscription<void>? chapterSubscription;
-    var isClosed = false;
     final controller = StreamController<List<MangaModel>>.broadcast();
+    var listenerCount = 0;
+    var started = false;
+    Future<void>? _pendingEmit;
 
     Future<void> emitSnapshot() async {
-      if (isClosed || controller.isClosed) {
+      if (controller.isClosed) {
         return;
       }
-      final mangas = await getAllMangas();
-      if (!controller.isClosed) {
-        controller.add(mangas);
+      if (_pendingEmit != null) {
+        await _pendingEmit;
+        return;
+      }
+      final completer = Completer<void>();
+      _pendingEmit = completer.future;
+      try {
+        final mangas = await getAllMangas();
+        if (!controller.isClosed) {
+          controller.add(List<MangaModel>.unmodifiable(mangas));
+        }
+      } finally {
+        completer.complete();
+        _pendingEmit = null;
       }
     }
 
@@ -167,24 +181,45 @@ class MangaLocalDataSource {
       unawaited(emitSnapshot());
     }
 
-    void start() {
-      mangaSubscription = _mangaCollection
-          .watchLazy(fireImmediately: false)
-          .listen(scheduleSnapshot, onError: controller.addError);
-      chapterSubscription = _chapterCollection
-          .watchLazy(fireImmediately: false)
-          .listen(scheduleSnapshot, onError: controller.addError);
-      scheduleSnapshot();
-    }
-
-    controller.onListen = start;
-    controller.onCancel = () async {
-      if (controller.hasListener) {
+    Future<void> start() async {
+      if (started) {
         return;
       }
-      isClosed = true;
+      started = true;
+      mangaSubscription = _mangaCollection
+          .watchLazy(fireImmediately: true)
+          .listen(scheduleSnapshot, onError: controller.addError);
+      chapterSubscription = _chapterCollection
+          .watchLazy(fireImmediately: true)
+          .listen(scheduleSnapshot, onError: controller.addError);
+      await emitSnapshot();
+    }
+
+    controller.onListen = () {
+      listenerCount++;
+      unawaited(start());
+    };
+
+    controller.onCancel = () async {
+      listenerCount = math.max(0, listenerCount - 1);
+      if (listenerCount > 0) {
+        return;
+      }
       await mangaSubscription?.cancel();
       await chapterSubscription?.cancel();
+      mangaSubscription = null;
+      chapterSubscription = null;
+      started = false;
+    };
+
+    controller.onPause = () {
+      mangaSubscription?.pause();
+      chapterSubscription?.pause();
+    };
+
+    controller.onResume = () {
+      mangaSubscription?.resume();
+      chapterSubscription?.resume();
     };
 
     return controller.stream;
