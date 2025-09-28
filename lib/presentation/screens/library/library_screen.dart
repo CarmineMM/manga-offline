@@ -100,7 +100,7 @@ class _LibrarySuccessBody extends StatelessWidget {
     return Column(
       children: <Widget>[
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 8),
           child: TextField(
             controller: searchController,
             decoration: InputDecoration(
@@ -138,7 +138,7 @@ class _LibrarySuccessBody extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: Padding(
-              padding: const EdgeInsets.only(right: 16, bottom: 8),
+              padding: const EdgeInsetsDirectional.only(end: 16, bottom: 8),
               child: TextButton.icon(
                 onPressed: libraryCubit.resetFilters,
                 icon: const Icon(Icons.clear),
@@ -187,7 +187,7 @@ class _LibraryList extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView.separated(
       key: const PageStorageKey<String>('libraryList'),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      padding: const EdgeInsetsDirectional.fromSTEB(5, 5, 5, 24),
       itemBuilder: (BuildContext context, int index) {
         final manga = mangas[index];
         return MangaLibraryTile(
