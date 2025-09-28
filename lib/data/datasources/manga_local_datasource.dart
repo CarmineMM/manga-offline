@@ -268,6 +268,22 @@ class MangaLocalDataSource {
     return chapter?.status;
   }
 
+  /// Updates the stored cover path for a manga.
+  Future<void> updateMangaCover({
+    required String referenceId,
+    String? coverImagePath,
+  }) async {
+    await isar.writeTxn(() async {
+      final manga = await getManga(referenceId);
+      if (manga == null) {
+        return;
+      }
+      manga.coverImagePath = coverImagePath;
+      manga.lastUpdated = DateTime.now();
+      await _mangaCollection.put(manga);
+    });
+  }
+
   Future<void> _deleteChaptersForManga(String referenceId) async {
     final query = _chapterCollection.buildQuery<ChapterModel>(
       filter: FilterCondition.equalTo(

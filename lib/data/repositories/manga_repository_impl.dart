@@ -60,6 +60,23 @@ class MangaRepositoryImpl implements MangaRepository {
   }
 
   @override
+  Future<Manga?> getManga(String mangaId) async {
+    final model = await _localDataSource.getManga(mangaId);
+    if (model == null) {
+      return null;
+    }
+    final chapterModels = await _localDataSource.getChaptersForManga(mangaId);
+    final chapters = <Chapter>[];
+    for (final chapterModel in chapterModels) {
+      final pages = await _localDataSource.getPagesForChapter(
+        chapterModel.referenceId,
+      );
+      chapters.add(chapterModel.toEntity(pages: pages));
+    }
+    return model.toEntity(chapters: chapterModels).copyWith(chapters: chapters);
+  }
+
+  @override
   Future<void> saveChapter(Chapter chapter) {
     final model = ChapterModel.fromEntity(chapter);
     final pages = chapter.pages
@@ -96,5 +113,16 @@ class MangaRepositoryImpl implements MangaRepository {
   @override
   Future<DownloadStatus?> getChapterDownloadStatus(String chapterId) {
     return _localDataSource.getChapterDownloadStatus(chapterId);
+  }
+
+  @override
+  Future<void> updateMangaCover({
+    required String mangaId,
+    String? coverImagePath,
+  }) {
+    return _localDataSource.updateMangaCover(
+      referenceId: mangaId,
+      coverImagePath: coverImagePath,
+    );
   }
 }

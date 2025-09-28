@@ -36,6 +36,9 @@ class InMemoryMangaRepository implements MangaRepository {
   Stream<List<Manga>> watchLocalLibrary() => _controller.stream;
 
   @override
+  Future<Manga?> getManga(String mangaId) async => _mangas[mangaId];
+
+  @override
   Future<void> saveManga(Manga manga) async {
     _mangas[manga.id] = manga;
     _emit();
@@ -181,6 +184,19 @@ class InMemoryMangaRepository implements MangaRepository {
       }
     }
     return null;
+  }
+
+  @override
+  Future<void> updateMangaCover({
+    required String mangaId,
+    String? coverImagePath,
+  }) async {
+    final existing = _mangas[mangaId];
+    if (existing == null) {
+      return;
+    }
+    _mangas[mangaId] = existing.copyWith(coverImagePath: coverImagePath);
+    _emit();
   }
 
   /// Seeds the repository with placeholder content.

@@ -10,6 +10,9 @@ abstract interface class MangaRepository {
   /// Persists downloaded manga metadata locally.
   Future<void> saveManga(Manga manga);
 
+  /// Retrieves a manga by its identifier, if stored in the local cache.
+  Future<Manga?> getManga(String mangaId);
+
   /// Persists the provided [chapter], ensuring metadata and related pages
   /// stay in sync with the parent manga record.
   Future<void> saveChapter(Chapter chapter);
@@ -29,4 +32,10 @@ abstract interface class MangaRepository {
 
   /// Returns the current download status for the specified chapter, if stored.
   Future<DownloadStatus?> getChapterDownloadStatus(String chapterId);
+
+  /// Updates persisted cover metadata for the given manga.
+  Future<void> updateMangaCover({
+    required String mangaId,
+    String? coverImagePath,
+  });
 }

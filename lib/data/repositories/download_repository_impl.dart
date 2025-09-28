@@ -159,6 +159,12 @@ class DownloadRepositoryImpl implements DownloadRepository {
     try {
       final currentChapter =
           await _mangaRepository.getChapter(job.chapter.id) ?? job.chapter;
+      final manga = await _mangaRepository.getManga(currentChapter.mangaId);
+      await _ensureMangaCover(
+        manga: manga,
+        mangaId: currentChapter.mangaId,
+        sourceId: currentChapter.sourceId,
+      );
       final pages = await _catalogRepository.fetchChapterPages(
         sourceId: currentChapter.sourceId,
         mangaId: currentChapter.mangaId,
@@ -324,6 +330,123 @@ class DownloadRepositoryImpl implements DownloadRepository {
       }
     }
     return null;
+  }
+
+  Future<void> _ensureMangaCover({
+    Manga? manga,
+    required String mangaId,
+    required String sourceId,
+  }) async {
+    var resolvedManga = manga;
+    if (resolvedManga == null) {
+      try {
+        resolvedManga = await _catalogRepository.fetchMangaDetail(
+          sourceId: sourceId,
+          mangaId: mangaId,
+        );
+        await _mangaRepository.saveManga(resolvedManga);
+      } catch (error, stack) {
+        _log(
+          'No se encontró registro local para manga $mangaId y la descarga del detalle falló',
+          error: error,
+          stack: stack,
+        );
+        return;
+      }
+    }
+
+    final existingPath = resolvedManga.coverImagePath;
+    if (existingPath != null && existingPath.isNotEmpty) {
+      final existingFile = File(existingPath);
+      if (await existingFile.exists()) {
+        return;
+      }
+      await _mangaRepository.updateMangaCover(
+        mangaId: resolvedManga.id,
+        coverImagePath: null,
+      );
+    }
+
+    final coverUrl = await _resolveCoverUrl(
+      manga: resolvedManga,
+      sourceId: sourceId,
+    );
+    if (coverUrl == null || coverUrl.isEmpty) {
+      return;
+    }
+
+    try {
+      final uri = Uri.parse(coverUrl);
+      final response = await _httpClient.get(uri);
+      if (response.statusCode != 200) {
+        _log(
+          'No se pudo descargar portada para ${resolvedManga.id} (codigo ${response.statusCode})',
+        );
+        return;
+      }
+
+      final documents = await _documentsDirectoryProvider();
+      final targetDirectory = Directory(
+        p.join(
+          documents.path,
+          'manga_offline',
+          resolvedManga.sourceId,
+          resolvedManga.id,
+        ),
+      );
+      if (!await targetDirectory.exists()) {
+        await targetDirectory.create(recursive: true);
+      }
+
+      var extension = _inferExtension(uri, response.headers['content-type']);
+      if (extension.isEmpty) {
+        extension = 'png';
+      }
+      final file = File(p.join(targetDirectory.path, 'cover.$extension'));
+      await file.writeAsBytes(response.bodyBytes, flush: true);
+
+      if (existingPath != null && existingPath != file.path) {
+        final previousFile = File(existingPath);
+        if (await previousFile.exists()) {
+          await previousFile.delete();
+        }
+      }
+
+      await _mangaRepository.updateMangaCover(
+        mangaId: resolvedManga.id,
+        coverImagePath: file.path,
+      );
+    } catch (error, stack) {
+      _log(
+        'Error inesperado al descargar portada para ${resolvedManga.id}',
+        error: error,
+        stack: stack,
+      );
+    }
+  }
+
+  Future<String?> _resolveCoverUrl({
+    required Manga manga,
+    required String sourceId,
+  }) async {
+    if (manga.coverImageUrl != null && manga.coverImageUrl!.isNotEmpty) {
+      return manga.coverImageUrl;
+    }
+
+    try {
+      final detail = await _catalogRepository.fetchMangaDetail(
+        sourceId: sourceId,
+        mangaId: manga.id,
+      );
+      return detail.coverImageUrl ?? manga.coverImageUrl;
+    } catch (error, stack) {
+      _log(
+        'No se pudo obtener detalle del manga ${manga.id} para descargar portada',
+        error: error,
+        stack: stack,
+      );
+      return manga.coverImageUrl;
+    }
   }
 
   String _inferExtension(Uri uri, [String? contentType]) {
