@@ -5,6 +5,10 @@ import 'package:flutter/rendering.dart';
 import 'package:manga_offline/core/di/service_locator.dart';
 import 'package:manga_offline/core/utils/reader_preferences.dart';
 import 'package:manga_offline/domain/repositories/download_repository.dart';
+import 'package:manga_offline/domain/entities/chapter.dart';
+import 'package:manga_offline/presentation/screens/reader/chapter_reader_route.dart';
+import 'package:manga_offline/presentation/screens/reader/chapter_reader_types.dart';
+import 'package:manga_offline/presentation/screens/reader/widgets/chapter_navigation_bar.dart';
 
 /// Simple offline reader that displays the already downloaded image files for
 /// a given chapter in a [PageView].
@@ -16,7 +20,10 @@ class OfflineReaderScreen extends StatefulWidget {
     required this.chapterId,
     required this.chapterTitle,
     this.initialPage = 0,
-    this.onProgress,
+    required this.chapters,
+    required this.chapterIndex,
+    this.onChapterProgress,
+    this.onDownloadChapter,
   });
 
   final String sourceId;
@@ -24,7 +31,10 @@ class OfflineReaderScreen extends StatefulWidget {
   final String chapterId;
   final String chapterTitle;
   final int initialPage;
-  final void Function(int pageIndex)? onProgress;
+  final List<Chapter> chapters;
+  final int chapterIndex;
+  final ChapterProgressCallback? onChapterProgress;
+  final ChapterDownloadCallback? onDownloadChapter;
 
   @override
   State<OfflineReaderScreen> createState() => _OfflineReaderScreenState();
@@ -44,6 +54,8 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
   int _scrollRetryCount = 0;
   bool _initialProgressDispatched = false;
 
+  bool get _hasPrevious => widget.chapterIndex > 0;
+  bool get _hasNext => widget.chapterIndex < widget.chapters.length - 1;
   @override
   void initState() {
     super.initState();
@@ -122,21 +134,43 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
         ],
       ),
       backgroundColor: Colors.black,
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _paths.isEmpty
-          ? Center(
-              child: Text(
-                'No se encontraron páginas locales para este capítulo.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            )
-          : _verticalMode
+      body: _buildBody(theme),
+    );
+  }
+
+  Widget _buildBody(ThemeData theme) {
+    Widget content;
+    if (_loading) {
+      content = const Center(child: CircularProgressIndicator());
+    } else if (_paths.isEmpty) {
+      content = Center(
+        child: Text(
+          'No se encontraron páginas locales para este capítulo.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      );
+    } else {
+      content = _verticalMode
           ? _buildVerticalReader()
-          : _buildHorizontalReader(),
+          : _buildHorizontalReader();
+    }
+
+    final showNavigation = !_loading && widget.chapters.length > 1;
+    if (!showNavigation) {
+      return content;
+    }
+
+    return Column(
+      children: <Widget>[
+        Expanded(child: content),
+        ChapterNavigationBar(
+          onPrevious: _hasPrevious ? () => _openSiblingChapter(-1) : null,
+          onNext: _hasNext ? () => _openSiblingChapter(1) : null,
+        ),
+      ],
     );
   }
 
@@ -259,16 +293,34 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
     if (!_initialProgressDispatched || index != _currentPage) {
       _currentPage = index;
       _initialProgressDispatched = true;
-      widget.onProgress?.call(index);
+      final chapter = widget.chapters[widget.chapterIndex];
+      widget.onChapterProgress?.call(chapter, index);
     }
   }
 
   @override
   void dispose() {
-    widget.onProgress?.call(_currentPage);
+    final chapter = widget.chapters[widget.chapterIndex];
+    widget.onChapterProgress?.call(chapter, _currentPage);
     _controller.dispose();
     _verticalController.dispose();
     super.dispose();
+  }
+
+  void _openSiblingChapter(int delta) {
+    final targetIndex = widget.chapterIndex + delta;
+    if (targetIndex < 0 || targetIndex >= widget.chapters.length) {
+      return;
+    }
+    final target = widget.chapters[targetIndex];
+    final route = buildChapterReaderRoute(
+      chapter: target,
+      chapters: widget.chapters,
+      chapterIndex: targetIndex,
+      onProgress: widget.onChapterProgress,
+      onDownload: widget.onDownloadChapter,
+    );
+    Navigator.of(context).pushReplacement(route);
   }
 }
 

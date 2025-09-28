@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manga_offline/core/di/service_locator.dart';
 import 'package:manga_offline/core/utils/reader_preferences.dart';
+import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
 import 'package:manga_offline/domain/entities/page_image.dart';
 import 'package:manga_offline/domain/repositories/catalog_repository.dart';
@@ -74,7 +75,24 @@ void main() {
   testWidgets('online reader scrolls vertically in continuous mode', (
     WidgetTester tester,
   ) async {
-    final List<int> progressEvents = <int>[];
+    final chapters = <Chapter>[
+      const Chapter(
+        id: 'chapter-1',
+        mangaId: 'manga-1',
+        sourceId: 'olympus',
+        title: 'Chapter 1',
+        number: 1,
+      ),
+      const Chapter(
+        id: 'chapter-2',
+        mangaId: 'manga-1',
+        sourceId: 'olympus',
+        title: 'Chapter 2',
+        number: 2,
+      ),
+    ];
+
+    final List<(Chapter, int)> progressEvents = <(Chapter, int)>[];
 
     await tester.pumpWidget(
       MaterialApp(
@@ -83,7 +101,10 @@ void main() {
           mangaId: 'manga-1',
           chapterId: 'chapter-1',
           chapterTitle: 'Chapter 1',
-          onProgress: progressEvents.add,
+          chapters: chapters,
+          chapterIndex: 0,
+          onChapterProgress: (chapter, page) =>
+              progressEvents.add((chapter, page)),
         ),
       ),
     );
@@ -94,7 +115,8 @@ void main() {
     expect(find.byType(ListView), findsOneWidget);
     expect(find.byType(PageView), findsNothing);
     expect(progressEvents, isNotEmpty);
-    expect(progressEvents.first, 0);
+    expect(progressEvents.first.$1.id, 'chapter-1');
+    expect(progressEvents.first.$2, 0);
 
     await tester.drag(find.byType(ListView), const Offset(0, -600));
     await tester.pumpAndSettle();

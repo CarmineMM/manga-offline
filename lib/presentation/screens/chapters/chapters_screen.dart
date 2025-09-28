@@ -8,8 +8,7 @@ import 'package:manga_offline/domain/entities/manga.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/presentation/blocs/manga_detail/manga_detail_cubit.dart';
 import 'package:manga_offline/presentation/widgets/chapter_list_tile.dart';
-import 'package:manga_offline/presentation/screens/reader/offline_reader_screen.dart';
-import 'package:manga_offline/presentation/screens/reader/online_reader_screen.dart';
+import 'package:manga_offline/presentation/screens/reader/chapter_reader_route.dart';
 
 /// Displays the list of chapters for a given manga.
 class ChapterListScreen extends StatelessWidget {
@@ -175,40 +174,34 @@ class _ChapterListBody extends StatelessWidget {
               },
               onReadOnline: (Chapter selected) {
                 Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => OnlineReaderScreen(
-                      sourceId: selected.sourceId,
-                      mangaId: selected.mangaId,
-                      chapterId: selected.id,
-                      chapterTitle: selected.title,
-                      initialPage: (selected.lastReadPage ?? 1) - 1,
-                      onProgress: (pageIdx) =>
-                          detailCubit.updateChapterProgress(
-                            chapterId: selected.id,
-                            pageNumber: pageIdx,
-                          ),
-                      onDownloadChapter: () =>
-                          unawaited(detailCubit.downloadChapter(selected)),
-                    ),
+                  buildChapterReaderRoute(
+                    chapter: selected,
+                    chapters: chapters,
+                    chapterIndex: index,
+                    onProgress: (chapter, pageIdx) =>
+                        detailCubit.updateChapterProgress(
+                          chapterId: chapter.id,
+                          pageNumber: pageIdx,
+                        ),
+                    onDownload: (chapter) =>
+                        detailCubit.downloadChapter(chapter),
                   ),
                 );
               },
               onReadOffline: (Chapter selected) {
                 if (selected.status == DownloadStatus.downloaded) {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => OfflineReaderScreen(
-                        sourceId: selected.sourceId,
-                        mangaId: selected.mangaId,
-                        chapterId: selected.id,
-                        chapterTitle: selected.title,
-                        initialPage: (selected.lastReadPage ?? 1) - 1,
-                        onProgress: (pageIdx) =>
-                            detailCubit.updateChapterProgress(
-                              chapterId: selected.id,
-                              pageNumber: pageIdx,
-                            ),
-                      ),
+                    buildChapterReaderRoute(
+                      chapter: selected,
+                      chapters: chapters,
+                      chapterIndex: index,
+                      onProgress: (chapter, pageIdx) =>
+                          detailCubit.updateChapterProgress(
+                            chapterId: chapter.id,
+                            pageNumber: pageIdx,
+                          ),
+                      onDownload: (chapter) =>
+                          detailCubit.downloadChapter(chapter),
                     ),
                   );
                 } else {
