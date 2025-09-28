@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:manga_offline/domain/entities/chapter.dart';
+import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
 import 'package:manga_offline/domain/usecases/fetch_manga_detail.dart';
 import 'package:manga_offline/domain/usecases/queue_chapter_download.dart';
@@ -42,13 +43,17 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
       );
       // Merge persisted reading progress
       final hydrated = await _mergeProgress(manga);
-      final sorted = _applySorting(hydrated.chapters, state.sortOrder);
+      final visible = _composeVisibleChapters(
+        hydrated.chapters,
+        sortOrder: state.sortOrder,
+        filter: state.filter,
+      );
       emit(
         state.copyWith(
           status: MangaDetailStatus.success,
           manga: hydrated,
           errorMessage: null,
-          visibleChapters: sorted,
+          visibleChapters: visible,
         ),
       );
       await _subscribeToMangaUpdates(mangaId);
@@ -70,7 +75,11 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
         emit(
           state.copyWith(
             manga: updated,
-            visibleChapters: _applySorting(updated.chapters, state.sortOrder),
+            visibleChapters: _composeVisibleChapters(
+              updated.chapters,
+              sortOrder: state.sortOrder,
+              filter: state.filter,
+            ),
           ),
         );
       }
@@ -131,7 +140,11 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
       emit(
         state.copyWith(
           manga: updatedManga,
-          visibleChapters: _applySorting(updatedChapters, state.sortOrder),
+          visibleChapters: _composeVisibleChapters(
+            updatedChapters,
+            sortOrder: state.sortOrder,
+            filter: state.filter,
+          ),
         ),
       );
       // Persist the new page asynchronously (fire-and-forget)
@@ -179,9 +192,60 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
     emit(
       state.copyWith(
         sortOrder: nextOrder,
-        visibleChapters: _applySorting(chapters, nextOrder),
+        visibleChapters: _composeVisibleChapters(
+          chapters,
+          sortOrder: nextOrder,
+          filter: state.filter,
+        ),
       ),
     );
+  }
+
+  /// Cycles the active filter among all, downloaded and not downloaded.
+  void toggleChapterFilter() {
+    final nextFilter = switch (state.filter) {
+      ChapterFilter.all => ChapterFilter.downloaded,
+      ChapterFilter.downloaded => ChapterFilter.notDownloaded,
+      ChapterFilter.notDownloaded => ChapterFilter.all,
+    };
+    final chapters = state.manga?.chapters ?? const <Chapter>[];
+    emit(
+      state.copyWith(
+        filter: nextFilter,
+        visibleChapters: _composeVisibleChapters(
+          chapters,
+          sortOrder: state.sortOrder,
+          filter: nextFilter,
+        ),
+      ),
+    );
+  }
+
+  List<Chapter> _composeVisibleChapters(
+    List<Chapter> chapters, {
+    required ChapterSortOrder sortOrder,
+    required ChapterFilter filter,
+  }) {
+    if (chapters.isEmpty) {
+      return const <Chapter>[];
+    }
+    final filtered = _applyFilter(chapters, filter);
+    return _applySorting(filtered, sortOrder);
+  }
+
+  List<Chapter> _applyFilter(List<Chapter> chapters, ChapterFilter filter) {
+    switch (filter) {
+      case ChapterFilter.all:
+        return List<Chapter>.from(chapters);
+      case ChapterFilter.downloaded:
+        return chapters
+            .where((chapter) => chapter.status == DownloadStatus.downloaded)
+            .toList(growable: false);
+      case ChapterFilter.notDownloaded:
+        return chapters
+            .where((chapter) => chapter.status != DownloadStatus.downloaded)
+            .toList(growable: false);
+    }
   }
 
   List<Chapter> _applySorting(List<Chapter> chapters, ChapterSortOrder order) {

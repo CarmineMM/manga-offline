@@ -52,11 +52,28 @@ class _ChapterListView extends StatelessWidget {
         final loaded = state.status == MangaDetailStatus.success;
         final chapters = loaded ? state.visibleChapters : initialManga.chapters;
         final canToggleOrder = loaded && (state.visibleChapters.length > 1);
+        final filterIcon = switch (state.filter) {
+          ChapterFilter.all => Icons.filter_list,
+          ChapterFilter.downloaded => Icons.download_done,
+          ChapterFilter.notDownloaded => Icons.cloud_download_outlined,
+        };
+        final filterTooltip = switch (state.filter) {
+          ChapterFilter.all => 'Mostrar solo descargados',
+          ChapterFilter.downloaded => 'Mostrar pendientes de descarga',
+          ChapterFilter.notDownloaded => 'Mostrar todos los capítulos',
+        };
 
         return Scaffold(
           appBar: AppBar(
             title: Text(manga.title),
             actions: [
+              if (loaded)
+                IconButton(
+                  icon: Icon(filterIcon),
+                  tooltip: filterTooltip,
+                  onPressed: () =>
+                      context.read<MangaDetailCubit>().toggleChapterFilter(),
+                ),
               if (canToggleOrder)
                 IconButton(
                   icon: Icon(
@@ -76,6 +93,7 @@ class _ChapterListView extends StatelessWidget {
             manga: manga,
             chapters: chapters,
             status: state.status,
+            filter: state.filter,
           ),
         );
       },
@@ -88,11 +106,13 @@ class _ChapterListBody extends StatelessWidget {
     required this.manga,
     required this.chapters,
     required this.status,
+    required this.filter,
   });
 
   final Manga manga;
   final List<Chapter> chapters;
   final MangaDetailStatus status;
+  final ChapterFilter filter;
 
   @override
   Widget build(BuildContext context) {
@@ -122,9 +142,15 @@ class _ChapterListBody extends StatelessWidget {
 
   Widget _buildChapterList() {
     if (chapters.isEmpty) {
-      return const SliverFillRemaining(
+      final message = switch (filter) {
+        ChapterFilter.all => 'Todavía no hay capítulos disponibles.',
+        ChapterFilter.downloaded => 'No hay capítulos descargados aún.',
+        ChapterFilter.notDownloaded =>
+          'No hay capítulos pendientes de descarga.',
+      };
+      return SliverFillRemaining(
         hasScrollBody: false,
-        child: Center(child: Text('Todavía no hay capítulos disponibles.')),
+        child: Center(child: Text(message)),
       );
     }
 
