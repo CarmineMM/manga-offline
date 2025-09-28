@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:manga_offline/core/di/service_locator.dart';
+import 'package:manga_offline/presentation/blocs/downloads/downloads_cubit.dart';
 import 'package:manga_offline/presentation/blocs/library/library_cubit.dart';
 import 'package:manga_offline/presentation/blocs/sources/sources_cubit.dart';
+import 'package:manga_offline/presentation/screens/downloads/downloads_screen.dart';
 import 'package:manga_offline/presentation/screens/library/library_screen.dart';
 import 'package:manga_offline/presentation/screens/settings/settings_screen.dart';
 
@@ -25,6 +27,10 @@ class _MainShellState extends State<MainShell> {
         create: (_) => serviceLocator<LibraryCubit>()..start(),
         child: const LibraryScreen(),
       ),
+      BlocProvider<DownloadsCubit>(
+        create: (_) => serviceLocator<DownloadsCubit>()..start(),
+        child: const DownloadsScreen(),
+      ),
       BlocProvider<SourcesCubit>(
         create: (_) => serviceLocator<SourcesCubit>()..start(),
         child: const SettingsScreen(),
@@ -43,6 +49,11 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.collections_bookmark_outlined),
             selectedIcon: Icon(Icons.collections_bookmark),
             label: 'Biblioteca',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.download_outlined),
+            selectedIcon: Icon(Icons.download),
+            label: 'Descargas',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),

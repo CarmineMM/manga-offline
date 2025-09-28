@@ -27,6 +27,7 @@ import 'package:manga_offline/domain/usecases/watch_downloaded_mangas.dart';
 import 'package:manga_offline/domain/usecases/queue_chapter_download.dart';
 import 'package:manga_offline/domain/usecases/queue_manga_download.dart';
 import 'package:manga_offline/presentation/blocs/debug/debug_log_cubit.dart';
+import 'package:manga_offline/presentation/blocs/downloads/downloads_cubit.dart';
 import 'package:manga_offline/presentation/blocs/library/library_cubit.dart';
 import 'package:manga_offline/presentation/blocs/manga_detail/manga_detail_cubit.dart';
 import 'package:manga_offline/presentation/blocs/sources/sources_cubit.dart';
@@ -114,6 +115,7 @@ Future<void> configureDependencies() async {
     ..registerLazySingleton(() => SyncSourceCatalog(serviceLocator()))
     ..registerLazySingleton(() => QueueChapterDownload(serviceLocator()))
     ..registerLazySingleton(() => QueueMangaDownload(serviceLocator()))
+    ..registerFactory(() => DownloadsCubit(serviceLocator()))
     ..registerFactory(() => LibraryCubit(serviceLocator()))
     ..registerFactory(() => DebugLogCubit(serviceLocator()))
     ..registerFactory(
