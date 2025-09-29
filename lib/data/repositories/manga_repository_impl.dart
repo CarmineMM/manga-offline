@@ -125,4 +125,9 @@ class MangaRepositoryImpl implements MangaRepository {
       coverImagePath: coverImagePath,
     );
   }
+
+  @override
+  Future<void> clearChapterDownload(String chapterId) {
+    return _localDataSource.clearChapterDownload(chapterId);
+  }
 }

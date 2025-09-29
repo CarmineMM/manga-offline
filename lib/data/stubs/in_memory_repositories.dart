@@ -199,6 +199,60 @@ class InMemoryMangaRepository implements MangaRepository {
     _emit();
   }
 
+  @override
+  Future<void> clearChapterDownload(String chapterId) async {
+    var changed = false;
+    for (final entry in _mangas.entries) {
+      final chapters = <Chapter>[];
+      var updated = false;
+      for (final chapter in entry.value.chapters) {
+        if (chapter.id == chapterId) {
+          updated = true;
+          changed = true;
+          chapters.add(
+            chapter.copyWith(
+              status: DownloadStatus.notDownloaded,
+              downloadedPages: 0,
+              localPath: null,
+              pages: const [],
+            ),
+          );
+        } else {
+          chapters.add(chapter);
+        }
+      }
+      if (!updated) {
+        continue;
+      }
+
+      final downloadedCount = chapters
+          .where((chapter) => chapter.status == DownloadStatus.downloaded)
+          .length;
+      final totalChapters = entry.value.totalChapters == 0
+          ? chapters.length
+          : entry.value.totalChapters;
+
+      var status = DownloadStatus.notDownloaded;
+      if (downloadedCount == 0) {
+        status = DownloadStatus.notDownloaded;
+      } else if (totalChapters > 0 && downloadedCount >= totalChapters) {
+        status = DownloadStatus.downloaded;
+      } else {
+        status = DownloadStatus.downloading;
+      }
+
+      _mangas[entry.key] = entry.value.copyWith(
+        chapters: chapters,
+        downloadedChapters: downloadedCount,
+        status: status,
+      );
+    }
+
+    if (changed) {
+      _emit();
+    }
+  }
+
   /// Seeds the repository with placeholder content.
   void seedLibrary(List<Manga> mangas) {
     for (final manga in mangas) {

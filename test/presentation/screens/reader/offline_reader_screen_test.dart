@@ -33,6 +33,14 @@ class _StubDownloadRepository implements DownloadRepository {
   }) async {
     return pages;
   }
+
+  @override
+  Future<void> deleteLocalChapterAssets({
+    required String sourceId,
+    required String mangaId,
+    required String chapterId,
+    String? localPath,
+  }) async {}
 }
 
 void main() {
@@ -99,6 +107,7 @@ void main() {
 
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(seconds: 2));
 
     expect(find.byType(ListView), findsOneWidget);
     expect(find.byType(PageView), findsNothing);

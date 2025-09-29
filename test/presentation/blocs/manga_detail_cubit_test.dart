@@ -8,6 +8,7 @@ import 'package:manga_offline/domain/entities/manga.dart';
 import 'package:manga_offline/domain/repositories/download_repository.dart';
 import 'package:manga_offline/domain/usecases/fetch_manga_detail.dart';
 import 'package:manga_offline/domain/usecases/queue_chapter_download.dart';
+import 'package:manga_offline/domain/usecases/delete_downloaded_chapter.dart';
 import 'package:manga_offline/domain/usecases/watch_downloaded_mangas.dart';
 import 'package:manga_offline/presentation/blocs/manga_detail/manga_detail_cubit.dart';
 
@@ -23,13 +24,21 @@ class _FakeDownloadRepository implements DownloadRepository {
 
   @override
   Future<List<String>> listLocalChapterPages({
-    required String chapterId,
-    required String mangaId,
     required String sourceId,
+    required String mangaId,
+    required String chapterId,
   }) async {
     // Return an empty list for tests; adjust to match expected return type if needed.
     return const <String>[];
   }
+
+  @override
+  Future<void> deleteLocalChapterAssets({
+    required String sourceId,
+    required String mangaId,
+    required String chapterId,
+    String? localPath,
+  }) async {}
 }
 
 void main() {
@@ -39,6 +48,8 @@ void main() {
     late FetchMangaDetail fetchMangaDetail;
     late WatchDownloadedMangas watchDownloadedMangas;
     late QueueChapterDownload queueChapterDownload;
+    late DeleteDownloadedChapter deleteDownloadedChapter;
+    late _FakeDownloadRepository downloadRepository;
     late ReadingProgressDataSource progressDataSource;
     late MangaDetailCubit cubit;
 
@@ -47,12 +58,18 @@ void main() {
       catalogRepository = InMemoryCatalogRepository(mangaRepository);
       fetchMangaDetail = FetchMangaDetail(catalogRepository);
       watchDownloadedMangas = WatchDownloadedMangas(mangaRepository);
-      queueChapterDownload = QueueChapterDownload(_FakeDownloadRepository());
+      downloadRepository = _FakeDownloadRepository();
+      queueChapterDownload = QueueChapterDownload(downloadRepository);
+      deleteDownloadedChapter = DeleteDownloadedChapter(
+        mangaRepository: mangaRepository,
+        downloadRepository: downloadRepository,
+      );
       progressDataSource = ReadingProgressDataSource.inMemory();
       cubit = MangaDetailCubit(
         fetchMangaDetail: fetchMangaDetail,
         watchDownloadedMangas: watchDownloadedMangas,
         queueChapterDownload: queueChapterDownload,
+        deleteDownloadedChapter: deleteDownloadedChapter,
         readingProgressDataSource: progressDataSource,
       );
     });

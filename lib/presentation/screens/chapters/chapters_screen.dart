@@ -225,6 +225,17 @@ class _ChapterListBody extends StatelessWidget {
                   _showMessage(context, 'Capítulo marcado como no leído.');
                 }
               },
+              onDeleteDownload: (Chapter selected) async {
+                final messenger = ScaffoldMessenger.of(context);
+                final removed = await detailCubit.removeChapterDownload(
+                  selected,
+                );
+                if (removed) {
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Descarga eliminada.')),
+                  );
+                }
+              },
             ),
           );
         }, childCount: chapters.length),

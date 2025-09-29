@@ -285,6 +285,24 @@ class MangaLocalDataSource {
     });
   }
 
+  /// Clears local assets metadata for the provided chapter and refreshes
+  /// parent counters accordingly.
+  Future<void> clearChapterDownload(String referenceId) async {
+    await isar.writeTxn(() async {
+      final chapter = await getChapter(referenceId);
+      if (chapter == null) {
+        return;
+      }
+
+      chapter.status = DownloadStatus.notDownloaded;
+      chapter.downloadedPages = 0;
+      chapter.localPath = null;
+      await _chapterCollection.put(chapter);
+      await _deletePagesForChapter(referenceId);
+      await _refreshMangaDownloadCounters(chapter.mangaReferenceId);
+    });
+  }
+
   /// Returns the download status of a stored manga, if available.
   Future<DownloadStatus?> getMangaDownloadStatus(String referenceId) async {
     final manga = await getManga(referenceId);

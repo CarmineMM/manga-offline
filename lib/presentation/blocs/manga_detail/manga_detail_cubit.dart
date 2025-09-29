@@ -7,6 +7,7 @@ import 'package:manga_offline/domain/entities/download_status.dart';
 import 'package:manga_offline/domain/entities/manga.dart';
 import 'package:manga_offline/domain/usecases/fetch_manga_detail.dart';
 import 'package:manga_offline/domain/usecases/queue_chapter_download.dart';
+import 'package:manga_offline/domain/usecases/delete_downloaded_chapter.dart';
 import 'package:manga_offline/domain/usecases/watch_downloaded_mangas.dart';
 import 'package:manga_offline/data/datasources/cache/reading_progress_datasource.dart';
 
@@ -19,16 +20,19 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
     required FetchMangaDetail fetchMangaDetail,
     required WatchDownloadedMangas watchDownloadedMangas,
     required QueueChapterDownload queueChapterDownload,
+    required DeleteDownloadedChapter deleteDownloadedChapter,
     required ReadingProgressDataSource readingProgressDataSource,
   }) : _fetchMangaDetail = fetchMangaDetail,
        _watchDownloadedMangas = watchDownloadedMangas,
        _queueChapterDownload = queueChapterDownload,
+       _deleteDownloadedChapter = deleteDownloadedChapter,
        _readingProgressDataSource = readingProgressDataSource,
        super(const MangaDetailState.initial());
 
   final FetchMangaDetail _fetchMangaDetail;
   final WatchDownloadedMangas _watchDownloadedMangas;
   final QueueChapterDownload _queueChapterDownload;
+  final DeleteDownloadedChapter _deleteDownloadedChapter;
   final ReadingProgressDataSource _readingProgressDataSource;
 
   StreamSubscription<List<Manga>>? _librarySubscription;
@@ -160,6 +164,40 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
   /// Adds the provided [chapter] to the download queue.
   Future<void> downloadChapter(Chapter chapter) {
     return _queueChapterDownload(chapter);
+  }
+
+  /// Removes the offline copy for a chapter and refreshes the UI state.
+  Future<bool> removeChapterDownload(Chapter chapter) async {
+    try {
+      await _deleteDownloadedChapter(chapter.id);
+      final current = state.manga;
+      if (current != null) {
+        final updatedChapters = <Chapter>[];
+        for (final entry in current.chapters) {
+          if (entry.id == chapter.id) {
+            updatedChapters.add(
+              entry.copyWith(
+                status: DownloadStatus.notDownloaded,
+                downloadedPages: 0,
+                localPath: null,
+                pages: const [],
+              ),
+            );
+          } else {
+            updatedChapters.add(entry);
+          }
+        }
+        _emitChapters(updatedChapters);
+      }
+      return true;
+    } catch (error) {
+      emit(
+        state.copyWith(
+          errorMessage: 'No se pudo eliminar la descarga del capítulo.',
+        ),
+      );
+      return false;
+    }
   }
 
   /// Updates the reading progress for a chapter (in-memory only for now).

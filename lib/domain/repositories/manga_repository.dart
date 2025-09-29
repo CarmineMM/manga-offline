@@ -38,4 +38,8 @@ abstract interface class MangaRepository {
     required String mangaId,
     String? coverImagePath,
   });
+
+  /// Clears the persisted download state for the provided chapter, removing
+  /// any cached assets and refreshing parent counters.
+  Future<void> clearChapterDownload(String chapterId);
 }

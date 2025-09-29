@@ -20,4 +20,13 @@ abstract interface class DownloadRepository {
     required String mangaId,
     required String chapterId,
   });
+
+  /// Deletes the local directory (and any assets) associated with a chapter
+  /// download.
+  Future<void> deleteLocalChapterAssets({
+    required String sourceId,
+    required String mangaId,
+    required String chapterId,
+    String? localPath,
+  });
 }

@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:manga_offline/app/app.dart';
 import 'package:manga_offline/core/di/service_locator.dart';
 import 'package:manga_offline/presentation/widgets/empty_state.dart';
+// ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

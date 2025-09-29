@@ -78,7 +78,7 @@ class Chapter {
     String? title,
     int? number,
     String? remoteUrl,
-    String? localPath,
+    Object? localPath = _unset,
     DownloadStatus? status,
     int? totalPages,
     int? downloadedPages,
@@ -95,7 +95,9 @@ class Chapter {
       title: title ?? this.title,
       number: number ?? this.number,
       remoteUrl: remoteUrl ?? this.remoteUrl,
-      localPath: localPath ?? this.localPath,
+      localPath: identical(localPath, _unset)
+          ? this.localPath
+          : localPath as String?,
       status: status ?? this.status,
       totalPages: totalPages ?? this.totalPages,
       downloadedPages: downloadedPages ?? this.downloadedPages,

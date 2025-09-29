@@ -19,6 +19,7 @@ import 'package:manga_offline/domain/usecases/get_chapter_download_status.dart';
 import 'package:manga_offline/domain/usecases/get_manga_download_status.dart';
 import 'package:manga_offline/domain/usecases/mark_chapter_downloaded.dart';
 import 'package:manga_offline/domain/usecases/mark_manga_downloaded.dart';
+import 'package:manga_offline/domain/usecases/delete_downloaded_chapter.dart';
 import 'package:manga_offline/domain/usecases/queue_chapter_download.dart';
 import 'package:manga_offline/domain/usecases/queue_manga_download.dart';
 import 'package:manga_offline/domain/usecases/sync_source_catalog.dart';
@@ -109,6 +110,10 @@ class _FakeCatalogRepository implements CatalogRepository {
 class _FakeDownloadRepository implements DownloadRepository {
   Chapter? lastChapter;
   Manga? lastManga;
+  String? lastDeletedChapterId;
+  String? lastDeletedSourceId;
+  String? lastDeletedMangaId;
+  String? lastDeletedPath;
   final StreamController<List<DownloadTask>> _controller =
       StreamController<List<DownloadTask>>.broadcast();
 
@@ -127,12 +132,25 @@ class _FakeDownloadRepository implements DownloadRepository {
 
   @override
   Future<List<String>> listLocalChapterPages({
-    required String chapterId,
-    required String mangaId,
     required String sourceId,
+    required String mangaId,
+    required String chapterId,
   }) async {
     // For use case tests we don't rely on actual files; return empty list.
     return const <String>[];
+  }
+
+  @override
+  Future<void> deleteLocalChapterAssets({
+    required String sourceId,
+    required String mangaId,
+    required String chapterId,
+    String? localPath,
+  }) async {
+    lastDeletedChapterId = chapterId;
+    lastDeletedSourceId = sourceId;
+    lastDeletedMangaId = mangaId;
+    lastDeletedPath = localPath;
   }
 
   void emitQueue(List<DownloadTask> queue) {
@@ -159,6 +177,9 @@ class _FakeMangaRepository implements MangaRepository {
 
   @override
   Stream<List<Manga>> watchLocalLibrary() => _controller.stream;
+
+  @override
+  Future<Manga?> getManga(String mangaId) async => _stored[mangaId];
 
   @override
   Future<void> saveManga(Manga manga) async {
@@ -231,6 +252,63 @@ class _FakeMangaRepository implements MangaRepository {
   @override
   Future<DownloadStatus?> getChapterDownloadStatus(String chapterId) async {
     return _chapterStatuses[chapterId];
+  }
+
+  @override
+  Future<void> updateMangaCover({
+    required String mangaId,
+    String? coverImagePath,
+  }) async {
+    final existing = _stored[mangaId];
+    if (existing == null) {
+      return;
+    }
+    _stored[mangaId] = existing.copyWith(coverImagePath: coverImagePath);
+    _controller.add(_stored.values.toList());
+  }
+
+  @override
+  Future<void> clearChapterDownload(String chapterId) async {
+    for (final entry in _stored.entries) {
+      final chapters = entry.value.chapters.toList();
+      final index = chapters.indexWhere((c) => c.id == chapterId);
+      if (index == -1) {
+        continue;
+      }
+
+      final target = chapters[index];
+      chapters[index] = target.copyWith(
+        status: DownloadStatus.notDownloaded,
+        downloadedPages: 0,
+        localPath: null,
+        pages: const [],
+      );
+
+      final downloadedCount = chapters
+          .where((c) => c.status == DownloadStatus.downloaded)
+          .length;
+      final totalChapters = entry.value.totalChapters == 0
+          ? chapters.length
+          : entry.value.totalChapters;
+
+      var status = DownloadStatus.notDownloaded;
+      if (downloadedCount == 0) {
+        status = DownloadStatus.notDownloaded;
+      } else if (totalChapters > 0 && downloadedCount >= totalChapters) {
+        status = DownloadStatus.downloaded;
+      } else {
+        status = DownloadStatus.downloading;
+      }
+
+      _stored[entry.key] = entry.value.copyWith(
+        chapters: chapters,
+        downloadedChapters: downloadedCount,
+        status: status,
+      );
+      _chapterStatuses[chapterId] = DownloadStatus.notDownloaded;
+      _controller.add(_stored.values.toList());
+      return;
+    }
   }
 }
 
@@ -385,6 +463,73 @@ void main() {
 
       await expectation;
     });
+  });
+
+  group('DeleteDownloadedChapter use case', () {
+    late _FakeMangaRepository mangaRepository;
+    late _FakeDownloadRepository downloadRepository;
+    late DeleteDownloadedChapter useCase;
+
+    setUp(() {
+      mangaRepository = _FakeMangaRepository();
+      downloadRepository = _FakeDownloadRepository();
+      useCase = DeleteDownloadedChapter(
+        mangaRepository: mangaRepository,
+        downloadRepository: downloadRepository,
+      );
+    });
+
+    tearDown(() {
+      mangaRepository.dispose();
+      downloadRepository.dispose();
+    });
+
+    test(
+      'removes assets and clears metadata when chapter is downloaded',
+      () async {
+        const chapterId = 'chapter-1';
+        const mangaId = 'manga-1';
+        const sourceId = 'source-1';
+        final chapter = Chapter(
+          id: chapterId,
+          mangaId: mangaId,
+          sourceId: sourceId,
+          title: 'Capítulo 1',
+          number: 1,
+          status: DownloadStatus.downloaded,
+          downloadedPages: 12,
+          localPath: '/tmp/path/chapter-1',
+        );
+        final manga = Manga(
+          id: mangaId,
+          sourceId: sourceId,
+          title: 'Manga 1',
+          status: DownloadStatus.downloaded,
+          totalChapters: 1,
+          downloadedChapters: 1,
+          chapters: [chapter],
+        );
+
+        await mangaRepository.saveManga(manga);
+        await mangaRepository.saveChapter(chapter);
+
+        await useCase(chapterId);
+
+        expect(downloadRepository.lastDeletedChapterId, equals(chapterId));
+        expect(downloadRepository.lastDeletedSourceId, equals(sourceId));
+        expect(downloadRepository.lastDeletedMangaId, equals(mangaId));
+        expect(
+          downloadRepository.lastDeletedPath,
+          equals('/tmp/path/chapter-1'),
+        );
+
+        final updated = await mangaRepository.getChapter(chapterId);
+        expect(updated, isNotNull);
+        expect(updated!.status, DownloadStatus.notDownloaded);
+        expect(updated.downloadedPages, equals(0));
+        expect(updated.localPath, isNull);
+      },
+    );
   });
 
   group('Manga download status use cases', () {

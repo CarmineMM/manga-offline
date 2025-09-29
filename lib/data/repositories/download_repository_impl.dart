@@ -284,6 +284,36 @@ class DownloadRepositoryImpl implements DownloadRepository {
     );
   }
 
+  @override
+  Future<void> deleteLocalChapterAssets({
+    required String sourceId,
+    required String mangaId,
+    required String chapterId,
+    String? localPath,
+  }) async {
+    try {
+      final Directory directory;
+      if (localPath != null && localPath.isNotEmpty) {
+        directory = Directory(localPath);
+      } else {
+        final documents = await _documentsDirectoryProvider();
+        directory = Directory(
+          p.join(documents.path, 'manga_offline', sourceId, mangaId, chapterId),
+        );
+      }
+
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    } catch (error, stack) {
+      _log(
+        'No se pudo eliminar los archivos locales del capítulo $chapterId',
+        error: error,
+        stack: stack,
+      );
+    }
+  }
+
   Future<Directory> _prepareChapterDirectory(Chapter chapter) async {
     final documents = await _documentsDirectoryProvider();
     final targetPath = p.join(

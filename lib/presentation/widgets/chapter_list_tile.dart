@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:manga_offline/domain/entities/chapter.dart';
 import 'package:manga_offline/domain/entities/download_status.dart';
@@ -12,6 +14,7 @@ class ChapterListTile extends StatefulWidget {
     this.onReadOnline,
     this.onReadOffline,
     this.onReadStatusChanged,
+    this.onDeleteDownload,
   });
 
   /// Chapter information rendered by the tile.
@@ -29,18 +32,23 @@ class ChapterListTile extends StatefulWidget {
   /// Callback triggered when the user toggles the read status.
   final void Function(Chapter chapter, bool markAsRead)? onReadStatusChanged;
 
+  /// Callback triggered when the user wants to remove the offline copy.
+  final Future<void> Function(Chapter chapter)? onDeleteDownload;
+
   @override
   State<ChapterListTile> createState() => _ChapterListTileState();
 }
 
 class _ChapterListTileState extends State<ChapterListTile> {
   bool _isDownloadRequested = false;
+  bool _isDeletingDownload = false;
 
   @override
   void didUpdateWidget(covariant ChapterListTile oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.chapter.id != oldWidget.chapter.id) {
       _isDownloadRequested = false;
+      _isDeletingDownload = false;
       return;
     }
     if (_isDownloadRequested) {
@@ -49,6 +57,10 @@ class _ChapterListTileState extends State<ChapterListTile> {
           status != DownloadStatus.failed) {
         _isDownloadRequested = false;
       }
+    }
+    if (_isDeletingDownload &&
+        widget.chapter.status != DownloadStatus.downloaded) {
+      _isDeletingDownload = false;
     }
   }
 
@@ -148,12 +160,30 @@ class _ChapterListTileState extends State<ChapterListTile> {
                 onReadOnline: widget.onReadOnline,
                 onReadOffline: widget.onReadOffline,
                 isDownloadLoading: isDownloadLoading,
+                onDeleteDownload: widget.onDeleteDownload != null
+                    ? () => _handleDelete(chapter)
+                    : null,
+                isDeletingDownload: _isDeletingDownload,
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _handleDelete(Chapter chapter) async {
+    if (widget.onDeleteDownload == null || _isDeletingDownload) {
+      return;
+    }
+    setState(() => _isDeletingDownload = true);
+    try {
+      await widget.onDeleteDownload!(chapter);
+    } finally {
+      if (mounted) {
+        setState(() => _isDeletingDownload = false);
+      }
+    }
   }
 }
 
@@ -241,6 +271,8 @@ class _ChapterActions extends StatelessWidget {
     this.onReadOnline,
     this.onReadOffline,
     this.isDownloadLoading = false,
+    this.onDeleteDownload,
+    this.isDeletingDownload = false,
   });
 
   final Chapter chapter;
@@ -248,6 +280,8 @@ class _ChapterActions extends StatelessWidget {
   final void Function(Chapter chapter)? onReadOnline;
   final void Function(Chapter chapter)? onReadOffline;
   final bool isDownloadLoading;
+  final VoidCallback? onDeleteDownload;
+  final bool isDeletingDownload;
 
   @override
   Widget build(BuildContext context) {
@@ -276,17 +310,35 @@ class _ChapterActions extends StatelessWidget {
           ),
         );
       case DownloadStatus.downloaded:
-        return Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton(
-            onPressed: onReadOffline != null
-                ? () => onReadOffline!(chapter)
-                : () => _showPendingMessage(
-                    context,
-                    'Muy pronto podrás leer el capítulo offline desde aquí.',
-                  ),
-            child: const Text('Leer offline'),
-          ),
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: <Widget>[
+            TextButton.icon(
+              onPressed: onDeleteDownload != null && !isDeletingDownload
+                  ? onDeleteDownload
+                  : null,
+              icon: isDeletingDownload
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.delete_outline),
+              label: Text(
+                isDeletingDownload ? 'Eliminando…' : 'Eliminar descarga',
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              onPressed: onReadOffline != null
+                  ? () => onReadOffline!(chapter)
+                  : () => _showPendingMessage(
+                      context,
+                      'Muy pronto podrás leer el capítulo offline desde aquí.',
+                    ),
+              child: const Text('Leer offline'),
+            ),
+          ],
         );
     }
   }

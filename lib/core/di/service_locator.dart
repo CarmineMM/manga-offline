@@ -30,6 +30,7 @@ import 'package:manga_offline/domain/usecases/fetch_manga_detail.dart';
 import 'package:manga_offline/domain/usecases/fetch_source_catalog.dart';
 import 'package:manga_offline/domain/usecases/get_available_sources.dart';
 import 'package:manga_offline/domain/usecases/get_source_last_sync.dart';
+import 'package:manga_offline/domain/usecases/delete_downloaded_chapter.dart';
 import 'package:manga_offline/domain/usecases/mark_source_synced.dart';
 import 'package:manga_offline/domain/usecases/sync_source_catalog.dart';
 import 'package:manga_offline/domain/usecases/update_source_selection.dart';
@@ -164,6 +165,12 @@ Future<void> configureDependencies() async {
     ..registerLazySingleton(() => GetSourceLastSync(serviceLocator()))
     ..registerLazySingleton(() => QueueChapterDownload(serviceLocator()))
     ..registerLazySingleton(() => QueueMangaDownload(serviceLocator()))
+    ..registerLazySingleton(
+      () => DeleteDownloadedChapter(
+        mangaRepository: serviceLocator(),
+        downloadRepository: serviceLocator(),
+      ),
+    )
     ..registerFactory(() => DownloadsCubit(serviceLocator()))
     ..registerFactory(() => LibraryCubit(serviceLocator()))
     ..registerFactory(() => DebugLogCubit(serviceLocator()))
@@ -172,6 +179,7 @@ Future<void> configureDependencies() async {
         fetchMangaDetail: serviceLocator(),
         watchDownloadedMangas: serviceLocator(),
         queueChapterDownload: serviceLocator(),
+        deleteDownloadedChapter: serviceLocator(),
         readingProgressDataSource: serviceLocator(),
       ),
     )
