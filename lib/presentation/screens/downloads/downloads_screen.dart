@@ -54,8 +54,8 @@ class DownloadsScreen extends StatelessWidget {
                     : ListView.separated(
                         physics: const AlwaysScrollableScrollPhysics(),
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 24,
+                          horizontal: 4,
+                          vertical: 5,
                         ),
                         itemCount: state.downloadedMangas.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),

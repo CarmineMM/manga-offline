@@ -52,6 +52,7 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
   int _currentPage = 0;
   int? _pendingScrollIndex;
   int _scrollRetryCount = 0;
+  int _pendingScrollGeneration = 0;
   bool _initialProgressDispatched = false;
 
   bool get _hasPrevious => widget.chapterIndex > 0;
@@ -85,7 +86,10 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
     );
     _initialProgressDispatched = false;
     if (_verticalMode) {
-      _scheduleScrollToIndex(_currentPage);
+      _scheduleScrollToIndex(
+        _currentPage,
+        delay: const Duration(milliseconds: 1500),
+      );
     } else if (_controller.hasClients && _paths.isNotEmpty) {
       _controller.jumpToPage(_currentPage);
     } else {
@@ -190,7 +194,7 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
 
   Widget _buildVerticalReader() {
     WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _tryApplyPendingScroll(),
+      (_) => _tryApplyPendingScroll(_pendingScrollGeneration),
     );
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScrollNotification,
@@ -250,21 +254,41 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
     return bestIndex;
   }
 
-  void _scheduleScrollToIndex(int index) {
+  void _scheduleScrollToIndex(int index, {Duration delay = Duration.zero}) {
     if (!_verticalMode || index < 0 || index >= _pageKeys.length) {
       return;
     }
     _pendingScrollIndex = index;
     _scrollRetryCount = 0;
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _tryApplyPendingScroll(),
-    );
+    final token = ++_pendingScrollGeneration;
+
+    void queueAttempt() {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && token == _pendingScrollGeneration) {
+          _tryApplyPendingScroll(token);
+        }
+      });
+    }
+
+    if (delay > Duration.zero) {
+      Future<void>.delayed(delay, () {
+        if (!mounted) return;
+        if (token != _pendingScrollGeneration) return;
+        queueAttempt();
+      });
+    } else {
+      queueAttempt();
+    }
   }
 
-  void _tryApplyPendingScroll() {
+  void _tryApplyPendingScroll(int token) {
     if (!mounted) return;
     final targetIndex = _pendingScrollIndex;
     if (targetIndex == null) {
+      return;
+    }
+    if (token != _pendingScrollGeneration) {
       return;
     }
     if (targetIndex < 0 || targetIndex >= _pageKeys.length) {
@@ -275,9 +299,11 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
     if (context == null) {
       if (_scrollRetryCount < 5) {
         _scrollRetryCount += 1;
-        WidgetsBinding.instance.addPostFrameCallback(
-          (_) => _tryApplyPendingScroll(),
-        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && token == _pendingScrollGeneration) {
+            _tryApplyPendingScroll(token);
+          }
+        });
       }
       return;
     }
