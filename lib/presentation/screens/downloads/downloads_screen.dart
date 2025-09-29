@@ -35,27 +35,39 @@ class DownloadsScreen extends StatelessWidget {
                     'No pudimos cargar tus descargas. Intenta de nuevo en unos segundos.',
               );
             case DownloadsStatus.success:
-              if (state.downloadedMangas.isEmpty) {
-                return const EmptyState(
-                  message:
-                      'Aún no tienes capítulos descargados. Descarga alguno desde la biblioteca.',
-                );
-              }
-              return ListView.separated(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 24,
-                ),
-                itemCount: state.downloadedMangas.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (BuildContext context, int index) {
-                  final manga = state.downloadedMangas[index];
-                  return MangaLibraryTile(
-                    manga: manga,
-                    showDownloadProgressDetails: true,
-                    onTap: () => _openMangaDetail(context, manga),
-                  );
-                },
+              return RefreshIndicator(
+                onRefresh: () => context.read<DownloadsCubit>().refresh(),
+                child: state.downloadedMangas.isEmpty
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 48,
+                        ),
+                        children: const <Widget>[
+                          EmptyState(
+                            message:
+                                'Aún no tienes capítulos descargados. Descarga alguno desde la biblioteca.',
+                          ),
+                        ],
+                      )
+                    : ListView.separated(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 24,
+                        ),
+                        itemCount: state.downloadedMangas.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (BuildContext context, int index) {
+                          final manga = state.downloadedMangas[index];
+                          return MangaLibraryTile(
+                            manga: manga,
+                            showDownloadProgressDetails: true,
+                            onTap: () => _openMangaDetail(context, manga),
+                          );
+                        },
+                      ),
               );
           }
         },

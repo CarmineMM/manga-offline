@@ -21,31 +21,44 @@ class DownloadsCubit extends Cubit<DownloadsState> {
     emit(state.copyWith(status: DownloadsStatus.loading));
     _subscription?.cancel();
     _subscription = _watchDownloadedMangas().listen(
-      (List<Manga> mangas) {
-        final downloaded = mangas
-            .where((Manga manga) => manga.downloadedChapters > 0)
-            .toList(growable: false);
-        emit(
-          state.copyWith(
-            status: DownloadsStatus.success,
-            downloadedMangas: downloaded,
-          ),
-        );
-      },
-      onError: (Object error, StackTrace stackTrace) {
-        emit(
-          state.copyWith(
-            status: DownloadsStatus.failure,
-            downloadedMangas: const <Manga>[],
-          ),
-        );
-      },
+      _emitDownloaded,
+      onError: _emitFailure,
     );
+  }
+
+  Future<void> refresh() async {
+    try {
+      final mangas = await _watchDownloadedMangas().first;
+      _emitDownloaded(mangas);
+    } catch (error, stackTrace) {
+      _emitFailure(error, stackTrace);
+    }
   }
 
   @override
   Future<void> close() async {
     await _subscription?.cancel();
     return super.close();
+  }
+
+  void _emitDownloaded(List<Manga> mangas) {
+    final downloaded = mangas
+        .where((Manga manga) => manga.downloadedChapters > 0)
+        .toList(growable: false);
+    emit(
+      state.copyWith(
+        status: DownloadsStatus.success,
+        downloadedMangas: downloaded,
+      ),
+    );
+  }
+
+  void _emitFailure([Object? error, StackTrace? stackTrace]) {
+    emit(
+      state.copyWith(
+        status: DownloadsStatus.failure,
+        downloadedMangas: const <Manga>[],
+      ),
+    );
   }
 }

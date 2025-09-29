@@ -78,5 +78,13 @@ void main() {
         containsAll(<String>['omega-knights', 'mystic-lovers']),
       );
     });
+
+    test('refresh loads snapshot without active subscription', () async {
+      await cubit.refresh();
+
+      expect(cubit.state.status, DownloadsStatus.success);
+      expect(cubit.state.downloadedMangas.length, 1);
+      expect(cubit.state.downloadedMangas.first.id, 'omega-knights');
+    });
   });
 }
