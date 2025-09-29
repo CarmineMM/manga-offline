@@ -151,53 +151,41 @@ class MangaLocalDataSource {
   Stream<List<MangaModel>> watchMangas() {
     StreamSubscription<void>? mangaSubscription;
     StreamSubscription<void>? chapterSubscription;
-    final controller = StreamController<List<MangaModel>>.broadcast();
     var listenerCount = 0;
-    var started = false;
-    Future<void>? _pendingEmit;
+    final controller = StreamController<List<MangaModel>>.broadcast();
 
     Future<void> emitSnapshot() async {
       if (controller.isClosed) {
         return;
       }
-      if (_pendingEmit != null) {
-        await _pendingEmit;
-        return;
-      }
-      final completer = Completer<void>();
-      _pendingEmit = completer.future;
       try {
         final mangas = await getAllMangas();
         if (!controller.isClosed) {
           controller.add(List<MangaModel>.unmodifiable(mangas));
         }
-      } finally {
-        completer.complete();
-        _pendingEmit = null;
+      } catch (error, stackTrace) {
+        if (!controller.isClosed) {
+          controller.addError(error, stackTrace);
+        }
       }
     }
 
-    void scheduleSnapshot([_]) {
-      unawaited(emitSnapshot());
-    }
-
-    Future<void> start() async {
-      if (started) {
+    void ensureSubscriptions() {
+      if (mangaSubscription != null && chapterSubscription != null) {
         return;
       }
-      started = true;
-      mangaSubscription = _mangaCollection
+      mangaSubscription ??= _mangaCollection
           .watchLazy(fireImmediately: true)
-          .listen(scheduleSnapshot, onError: controller.addError);
-      chapterSubscription = _chapterCollection
+          .listen((_) => emitSnapshot(), onError: controller.addError);
+      chapterSubscription ??= _chapterCollection
           .watchLazy(fireImmediately: true)
-          .listen(scheduleSnapshot, onError: controller.addError);
-      await emitSnapshot();
+          .listen((_) => emitSnapshot(), onError: controller.addError);
+      unawaited(emitSnapshot());
     }
 
     controller.onListen = () {
       listenerCount++;
-      unawaited(start());
+      ensureSubscriptions();
     };
 
     controller.onCancel = () async {
@@ -209,17 +197,6 @@ class MangaLocalDataSource {
       await chapterSubscription?.cancel();
       mangaSubscription = null;
       chapterSubscription = null;
-      started = false;
-    };
-
-    controller.onPause = () {
-      mangaSubscription?.pause();
-      chapterSubscription?.pause();
-    };
-
-    controller.onResume = () {
-      mangaSubscription?.resume();
-      chapterSubscription?.resume();
     };
 
     return controller.stream;
