@@ -376,6 +376,101 @@ class MangaLocalDataSource {
     await _mangaCollection.put(manga);
   }
 
+  /// Attempts to locate an existing manga entry that matches the provided
+  /// [slug] after normalizing dynamic numeric suffixes frequently appended by
+  /// some sources.
+  Future<MangaModel?> findMangaBySlugAlias({
+    required String sourceId,
+    required String slug,
+  }) async {
+    final normalized = _normalizeSlug(slug);
+    if (normalized == slug) {
+      return null;
+    }
+
+    final candidates = await getMangasBySource(sourceId);
+    for (final candidate in candidates) {
+      if (_normalizeSlug(candidate.referenceId) == normalized) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  /// Migrates all persisted information from [fromSlug] into the entry
+  /// identified by [toSlug], consolidating downloaded chapters and user flags.
+  /// When the destination does not exist the source record is simply renamed.
+  Future<MangaModel?> migrateMangaSlug({
+    required String sourceId,
+    required String fromSlug,
+    required String toSlug,
+  }) async {
+    if (fromSlug == toSlug) {
+      return getManga(toSlug);
+    }
+
+    return isar.writeTxn<MangaModel?>(() async {
+      final source = await getManga(fromSlug);
+      if (source == null || source.sourceId != sourceId) {
+        return getManga(toSlug);
+      }
+
+      final target = await getManga(toSlug);
+      final sourceChapters = await getChaptersForManga(fromSlug);
+      final targetChapters = target != null
+          ? await getChaptersForManga(toSlug)
+          : <ChapterModel>[];
+
+      final Map<String, ChapterModel> mergedById = {
+        for (final chapter in targetChapters) chapter.referenceId: chapter,
+      };
+
+      for (final chapter in sourceChapters) {
+        chapter.mangaReferenceId = toSlug;
+        final existing = mergedById[chapter.referenceId];
+        if (existing == null || _preferIncomingChapter(existing, chapter)) {
+          mergedById[chapter.referenceId] = chapter;
+        }
+      }
+
+      final mergedChapters = mergedById.values.toList(growable: false)
+        ..sort((a, b) => a.number.compareTo(b.number));
+
+      if (mergedChapters.isNotEmpty) {
+        await _chapterCollection.putAll(mergedChapters);
+      }
+
+      final mergedManga = target ?? source;
+      mergedManga
+        ..referenceId = toSlug
+        ..coverImagePath = source.coverImagePath ?? mergedManga.coverImagePath
+        ..sourceName = source.sourceName ?? mergedManga.sourceName
+        ..isFavorite = mergedManga.isFavorite || source.isFavorite
+        ..downloadedChapters = mergedChapters
+            .where((chapter) => chapter.status == DownloadStatus.downloaded)
+            .length
+        ..totalChapters = mergedManga.totalChapters != 0
+            ? mergedManga.totalChapters
+            : mergedChapters.length
+        ..status = _deriveStatus(
+          mergedManga.totalChapters,
+          mergedManga.downloadedChapters,
+        )
+        ..chapterIds = mergedChapters
+            .map((chapter) => chapter.referenceId)
+            .toList(growable: false)
+        ..lastUpdated = DateTime.now();
+
+      await _mangaCollection.put(mergedManga);
+
+      if (target != null && source.id != target.id && source.id != null) {
+        await _mangaCollection.delete(source.id!);
+      }
+
+      return mergedManga;
+    });
+  }
+
   int _chapterId(String referenceId, String sourceId) {
     return _hashString('$sourceId::$referenceId');
   }
@@ -383,4 +478,44 @@ class MangaLocalDataSource {
   int _pageId(String referenceId) => _hashString('page::$referenceId');
 
   int _hashString(String value) => value.hashCode & 0x7fffffffffffffff;
+
+  String _normalizeSlug(String slug) {
+    return slug.replaceAll(RegExp(r'(?:-\d+)+$'), '');
+  }
+
+  bool _preferIncomingChapter(ChapterModel current, ChapterModel incoming) {
+    if (incoming.status == DownloadStatus.downloaded &&
+        current.status != DownloadStatus.downloaded) {
+      return true;
+    }
+    if (incoming.status != DownloadStatus.downloaded &&
+        current.status == DownloadStatus.downloaded) {
+      return false;
+    }
+    if (incoming.downloadedPages > current.downloadedPages) {
+      return true;
+    }
+    if (incoming.totalPages > current.totalPages) {
+      return true;
+    }
+    final incomingRead = incoming.lastReadAt;
+    final currentRead = current.lastReadAt;
+    if (incomingRead != null && currentRead != null) {
+      return incomingRead.isAfter(currentRead);
+    }
+    if (incomingRead != null && currentRead == null) {
+      return true;
+    }
+    return false;
+  }
+
+  DownloadStatus _deriveStatus(int totalChapters, int downloadedChapters) {
+    if (downloadedChapters == 0) {
+      return DownloadStatus.notDownloaded;
+    }
+    if (totalChapters > 0 && downloadedChapters >= totalChapters) {
+      return DownloadStatus.downloaded;
+    }
+    return DownloadStatus.downloading;
+  }
 }

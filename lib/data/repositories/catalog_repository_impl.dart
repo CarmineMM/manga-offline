@@ -38,7 +38,21 @@ class CatalogRepositoryImpl implements CatalogRepository {
     final timestamp = DateTime.now();
 
     for (final summary in summaries) {
-      final existing = await _localDataSource.getManga(summary.slug);
+      var existing = await _localDataSource.getManga(summary.slug);
+      final alias = await _localDataSource.findMangaBySlugAlias(
+        sourceId: summary.sourceId,
+        slug: summary.slug,
+      );
+
+      if (alias != null && alias.referenceId != summary.slug) {
+        existing = await _localDataSource.migrateMangaSlug(
+          sourceId: summary.sourceId,
+          fromSlug: alias.referenceId,
+          toSlug: summary.slug,
+        );
+      }
+
+      existing ??= await _localDataSource.getManga(summary.slug);
       if (existing == null) {
         final manga = summary.toDomain(lastUpdated: timestamp);
         final model = MangaModel.fromEntity(manga);

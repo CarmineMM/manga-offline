@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:manga_offline/core/utils/app_metadata.dart';
 import 'package:manga_offline/core/di/service_locator.dart';
 import 'package:manga_offline/domain/entities/manga_source.dart';
 import 'package:manga_offline/domain/entities/source_capability.dart';
@@ -62,6 +63,9 @@ class _SettingsBody extends StatelessWidget {
               return const _SourcesIntroCard();
             }
             if (index == state.sources.length + 1) {
+              return const _AppVersionTile();
+            }
+            if (index == state.sources.length + 2) {
               return const _DebugToolsTile();
             }
             final source = state.sources[index - 1];
@@ -71,7 +75,7 @@ class _SettingsBody extends StatelessWidget {
             );
           },
           separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemCount: state.sources.length + 2,
+          itemCount: state.sources.length + 3,
         );
     }
   }
@@ -250,6 +254,38 @@ class _DebugToolsTile extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Displays the currently installed application version.
+class _AppVersionTile extends StatelessWidget {
+  const _AppVersionTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final metadataFuture = serviceLocator<AppMetadataProvider>().load();
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.info_outline),
+        title: const Text('Versión de la app'),
+        subtitle: FutureBuilder<AppMetadata>(
+          future: metadataFuture,
+          builder: (BuildContext context, AsyncSnapshot<AppMetadata> snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Text('Cargando…');
+            }
+            if (snapshot.hasError) {
+              return const Text('No disponible');
+            }
+            final metadata = snapshot.data;
+            if (metadata == null) {
+              return const Text('No disponible');
+            }
+            return Text(metadata.formattedVersion);
+          },
+        ),
       ),
     );
   }

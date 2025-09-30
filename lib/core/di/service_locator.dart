@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:manga_offline/core/debug/debug_logger.dart';
+import 'package:manga_offline/core/utils/app_metadata.dart';
 import 'package:manga_offline/core/utils/reader_preferences.dart';
 import 'package:manga_offline/core/utils/source_preferences.dart';
 import 'package:manga_offline/data/constants/default_sources.dart';
@@ -151,6 +152,7 @@ Future<void> configureDependencies() async {
     ..registerSingleton<DownloadRepository>(downloadRepository)
     ..registerSingleton<PageCacheDataSource>(pageCache)
     ..registerSingleton<ReadingProgressDataSource>(readingProgressDs)
+    ..registerLazySingleton(AppMetadataProvider.new)
     ..registerSingleton<ReaderPreferences>(readerPrefs)
     ..registerLazySingleton(() => WatchDownloadedMangas(serviceLocator()))
     ..registerLazySingleton(() => WatchDownloadQueue(serviceLocator()))
