@@ -49,8 +49,6 @@ class _OnlineReaderScreenState extends State<OnlineReaderScreen> {
   List<PageImage> _pages = <PageImage>[];
   int _currentPage = 0;
   List<GlobalKey> _pageKeys = <GlobalKey>[];
-  int? _pendingScrollIndex;
-  int _scrollRetryCount = 0;
   bool _initialProgressDispatched = false;
 
   bool get _hasPrevious => widget.chapterIndex > 0;
@@ -90,16 +88,16 @@ class _OnlineReaderScreenState extends State<OnlineReaderScreen> {
         _pages.isEmpty ? 0 : _pages.length - 1,
       );
       _initialProgressDispatched = false;
-      if (_verticalMode) {
-        _scheduleScrollToIndex(_currentPage);
-      } else if (_pageController.hasClients && _pages.isNotEmpty) {
-        _pageController.jumpToPage(_currentPage);
-      } else {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_pageController.hasClients && mounted && _pages.isNotEmpty) {
-            _pageController.jumpToPage(_currentPage);
-          }
-        });
+      if (!_verticalMode) {
+        if (_pageController.hasClients && _pages.isNotEmpty) {
+          _pageController.jumpToPage(_currentPage);
+        } else {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_pageController.hasClients && mounted && _pages.isNotEmpty) {
+              _pageController.jumpToPage(_currentPage);
+            }
+          });
+        }
       }
       if (_pages.isNotEmpty) {
         _emitProgress(_currentPage);
@@ -139,9 +137,7 @@ class _OnlineReaderScreenState extends State<OnlineReaderScreen> {
             onPressed: () async {
               setState(() {
                 _verticalMode = !_verticalMode;
-                if (_verticalMode) {
-                  _scheduleScrollToIndex(_currentPage);
-                } else if (_pageController.hasClients) {
+                if (!_verticalMode && _pageController.hasClients) {
                   _pageController.jumpToPage(_currentPage);
                 }
               });
@@ -205,9 +201,6 @@ class _OnlineReaderScreenState extends State<OnlineReaderScreen> {
   }
 
   Widget _buildVerticalReader() {
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _tryApplyPendingScroll(),
-    );
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScrollNotification,
       child: ListView.builder(
@@ -264,42 +257,6 @@ class _OnlineReaderScreenState extends State<OnlineReaderScreen> {
       }
     }
     return bestIndex;
-  }
-
-  void _scheduleScrollToIndex(int index) {
-    if (!_verticalMode || index < 0 || index >= _pageKeys.length) {
-      return;
-    }
-    _pendingScrollIndex = index;
-    _scrollRetryCount = 0;
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _tryApplyPendingScroll(),
-    );
-  }
-
-  void _tryApplyPendingScroll() {
-    if (!mounted) return;
-    final targetIndex = _pendingScrollIndex;
-    if (targetIndex == null) {
-      return;
-    }
-    if (targetIndex < 0 || targetIndex >= _pageKeys.length) {
-      _pendingScrollIndex = null;
-      return;
-    }
-    final context = _pageKeys[targetIndex].currentContext;
-    if (context == null) {
-      if (_scrollRetryCount < 5) {
-        _scrollRetryCount += 1;
-        WidgetsBinding.instance.addPostFrameCallback(
-          (_) => _tryApplyPendingScroll(),
-        );
-      }
-      return;
-    }
-    _pendingScrollIndex = null;
-    _scrollRetryCount = 0;
-    Scrollable.ensureVisible(context, alignment: 0.05, duration: Duration.zero);
   }
 
   void _emitProgress(int index) {

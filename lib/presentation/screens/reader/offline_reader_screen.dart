@@ -50,9 +50,6 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
   bool _loading = true;
   bool _verticalMode = true;
   int _currentPage = 0;
-  int? _pendingScrollIndex;
-  int _scrollRetryCount = 0;
-  int _pendingScrollGeneration = 0;
   bool _initialProgressDispatched = false;
 
   bool get _hasPrevious => widget.chapterIndex > 0;
@@ -85,19 +82,16 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
       _paths.isEmpty ? 0 : _paths.length - 1,
     );
     _initialProgressDispatched = false;
-    if (_verticalMode) {
-      _scheduleScrollToIndex(
-        _currentPage,
-        delay: const Duration(milliseconds: 1500),
-      );
-    } else if (_controller.hasClients && _paths.isNotEmpty) {
-      _controller.jumpToPage(_currentPage);
-    } else {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_controller.hasClients && mounted && _paths.isNotEmpty) {
-          _controller.jumpToPage(_currentPage);
-        }
-      });
+    if (!_verticalMode) {
+      if (_controller.hasClients && _paths.isNotEmpty) {
+        _controller.jumpToPage(_currentPage);
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_controller.hasClients && mounted && _paths.isNotEmpty) {
+            _controller.jumpToPage(_currentPage);
+          }
+        });
+      }
     }
     if (_paths.isNotEmpty) {
       _emitProgress(_currentPage);
@@ -124,9 +118,7 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
             onPressed: () async {
               setState(() {
                 _verticalMode = !_verticalMode;
-                if (_verticalMode) {
-                  _scheduleScrollToIndex(_currentPage);
-                } else if (_controller.hasClients) {
+                if (!_verticalMode && _controller.hasClients) {
                   _controller.jumpToPage(_currentPage);
                 }
               });
@@ -193,9 +185,6 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
   }
 
   Widget _buildVerticalReader() {
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _tryApplyPendingScroll(_pendingScrollGeneration),
-    );
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScrollNotification,
       child: ListView.builder(
@@ -252,64 +241,6 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
       }
     }
     return bestIndex;
-  }
-
-  void _scheduleScrollToIndex(int index, {Duration delay = Duration.zero}) {
-    if (!_verticalMode || index < 0 || index >= _pageKeys.length) {
-      return;
-    }
-    _pendingScrollIndex = index;
-    _scrollRetryCount = 0;
-    final token = ++_pendingScrollGeneration;
-
-    void queueAttempt() {
-      if (!mounted) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && token == _pendingScrollGeneration) {
-          _tryApplyPendingScroll(token);
-        }
-      });
-    }
-
-    if (delay > Duration.zero) {
-      Future<void>.delayed(delay, () {
-        if (!mounted) return;
-        if (token != _pendingScrollGeneration) return;
-        queueAttempt();
-      });
-    } else {
-      queueAttempt();
-    }
-  }
-
-  void _tryApplyPendingScroll(int token) {
-    if (!mounted) return;
-    final targetIndex = _pendingScrollIndex;
-    if (targetIndex == null) {
-      return;
-    }
-    if (token != _pendingScrollGeneration) {
-      return;
-    }
-    if (targetIndex < 0 || targetIndex >= _pageKeys.length) {
-      _pendingScrollIndex = null;
-      return;
-    }
-    final context = _pageKeys[targetIndex].currentContext;
-    if (context == null) {
-      if (_scrollRetryCount < 5) {
-        _scrollRetryCount += 1;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && token == _pendingScrollGeneration) {
-            _tryApplyPendingScroll(token);
-          }
-        });
-      }
-      return;
-    }
-    _pendingScrollIndex = null;
-    _scrollRetryCount = 0;
-    Scrollable.ensureVisible(context, alignment: 0.05, duration: Duration.zero);
   }
 
   void _emitProgress(int index) {

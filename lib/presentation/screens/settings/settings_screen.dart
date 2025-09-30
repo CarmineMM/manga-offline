@@ -27,7 +27,7 @@ class SettingsScreen extends StatelessWidget {
       },
       builder: (BuildContext context, SourcesState state) {
         return Scaffold(
-          appBar: AppBar(title: const Text('Fuentes y ajustes')),
+          appBar: AppBar(title: const Text('Ajustes de la aplicación')),
           body: _SettingsBody(state: state),
         );
       },

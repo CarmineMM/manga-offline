@@ -58,7 +58,7 @@ class _MainShellState extends State<MainShell> {
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
-            label: 'Fuentes',
+            label: 'Ajustes',
           ),
         ],
       ),
