@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:manga_offline/core/theme/app_theme.dart';
 import 'package:manga_offline/presentation/screens/home/main_shell.dart';
 
 /// Root widget for the Manga Offline application.
@@ -13,10 +14,9 @@ class MangaOfflineApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Manga Offline',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: ThemeMode.system,
       debugShowCheckedModeBanner: false,
       home: const MainShell(),
     );

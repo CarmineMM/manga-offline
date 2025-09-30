@@ -41,6 +41,10 @@ class OfflineReaderScreen extends StatefulWidget {
 }
 
 class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
+  static const double _kAutoHideThreshold = 120;
+  static const Duration _kSlideDuration = Duration(milliseconds: 220);
+  static const Duration _kFadeDuration = Duration(milliseconds: 150);
+
   final DownloadRepository _downloadRepository = serviceLocator();
   final ReaderPreferences _readerPrefs = serviceLocator();
   late PageController _controller;
@@ -51,6 +55,8 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
   bool _verticalMode = true;
   int _currentPage = 0;
   bool _initialProgressDispatched = false;
+  bool _uiVisible = true;
+  double _scrollOffsetAccumulator = 0;
 
   bool get _hasPrevious => widget.chapterIndex > 0;
   bool get _hasNext => widget.chapterIndex < widget.chapters.length - 1;
@@ -102,6 +108,8 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
+      extendBody: true,
       appBar: AppBar(
         title: Text(widget.chapterTitle),
         actions: [
@@ -122,6 +130,8 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
                   _controller.jumpToPage(_currentPage);
                 }
               });
+              _scrollOffsetAccumulator = 0;
+              _showUi();
               await _readerPrefs.setMode(
                 _verticalMode ? ReaderMode.vertical : ReaderMode.paged,
               );
@@ -129,12 +139,19 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
           ),
         ],
       ),
-      backgroundColor: Colors.black,
-      body: _buildBody(theme),
+      body: _buildBody(context, theme),
     );
   }
 
-  Widget _buildBody(ThemeData theme) {
+  Widget _buildBody(BuildContext context, ThemeData theme) {
+    final media = MediaQuery.of(context);
+    final showNavigation = !_loading && widget.chapters.length > 1;
+    final EdgeInsets readerPadding = EdgeInsets.only(
+      bottom:
+          media.padding.bottom +
+          (showNavigation ? (_uiVisible ? 104 : 24) : 24),
+    );
+
     Widget content;
     if (_loading) {
       content = const Center(child: CircularProgressIndicator());
@@ -150,46 +167,54 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
       );
     } else {
       content = _verticalMode
-          ? _buildVerticalReader()
-          : _buildHorizontalReader();
+          ? _buildVerticalReader(readerPadding)
+          : _buildHorizontalReader(readerPadding);
     }
 
-    final showNavigation = !_loading && widget.chapters.length > 1;
-    if (!showNavigation) {
-      return content;
-    }
+    final bool allowImmersiveGestures = !_loading && _paths.isNotEmpty;
+    final Widget interactiveContent = allowImmersiveGestures
+        ? GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: _toggleUiVisibility,
+            child: content,
+          )
+        : content;
 
-    return Column(
+    return Stack(
       children: <Widget>[
-        Expanded(child: content),
-        ChapterNavigationBar(
-          onPrevious: _hasPrevious ? () => _openSiblingChapter(-1) : null,
-          onNext: _hasNext ? () => _openSiblingChapter(1) : null,
-        ),
+        Positioned.fill(child: interactiveContent),
+        if (showNavigation) _buildBottomBar(theme),
       ],
     );
   }
 
-  Widget _buildHorizontalReader() {
-    return PageView.builder(
-      controller: _controller,
-      scrollDirection: Axis.horizontal,
-      padEnds: false,
-      onPageChanged: _emitProgress,
-      itemCount: _paths.length,
-      itemBuilder: (BuildContext context, int index) {
-        final path = _paths[index];
-        return _PageImageView(path: path, enablePan: true, fit: BoxFit.contain);
-      },
+  Widget _buildHorizontalReader(EdgeInsets padding) {
+    return Padding(
+      padding: padding,
+      child: PageView.builder(
+        controller: _controller,
+        scrollDirection: Axis.horizontal,
+        padEnds: false,
+        onPageChanged: _emitProgress,
+        itemCount: _paths.length,
+        itemBuilder: (BuildContext context, int index) {
+          final path = _paths[index];
+          return _PageImageView(
+            path: path,
+            enablePan: true,
+            fit: BoxFit.contain,
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildVerticalReader() {
+  Widget _buildVerticalReader(EdgeInsets padding) {
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScrollNotification,
       child: ListView.builder(
         controller: _verticalController,
-        padding: EdgeInsets.zero,
+        padding: padding,
         itemCount: _paths.length,
         itemBuilder: (BuildContext context, int index) {
           final path = _paths[index];
@@ -206,6 +231,93 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
     );
   }
 
+  Widget _buildBottomBar(ThemeData theme) {
+    final ColorScheme colorScheme = theme.colorScheme;
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: IgnorePointer(
+        ignoring: !_uiVisible,
+        child: AnimatedSlide(
+          duration: _kSlideDuration,
+          curve: Curves.easeOut,
+          offset: _uiVisible ? Offset.zero : const Offset(0, 1.1),
+          child: AnimatedOpacity(
+            duration: _kFadeDuration,
+            opacity: _uiVisible ? 1 : 0,
+            child: Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                border: Border(
+                  top: BorderSide(color: colorScheme.outlineVariant),
+                ),
+              ),
+              child: ChapterNavigationBar(
+                onPrevious: _hasPrevious ? () => _openSiblingChapter(-1) : null,
+                onNext: _hasNext ? () => _openSiblingChapter(1) : null,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _toggleUiVisibility() {
+    setState(() {
+      _uiVisible = !_uiVisible;
+    });
+    _scrollOffsetAccumulator = 0;
+  }
+
+  void _showUi() {
+    if (_uiVisible) {
+      _scrollOffsetAccumulator = 0;
+      return;
+    }
+    setState(() {
+      _uiVisible = true;
+    });
+    _scrollOffsetAccumulator = 0;
+  }
+
+  void _hideUi() {
+    if (!_uiVisible) {
+      return;
+    }
+    setState(() {
+      _uiVisible = false;
+    });
+    _scrollOffsetAccumulator = 0;
+  }
+
+  void _handleAutoHide(ScrollNotification notification) {
+    if (!_verticalMode || _paths.isEmpty) {
+      return;
+    }
+    if (notification.metrics.axis != Axis.vertical) {
+      return;
+    }
+    if (notification is ScrollUpdateNotification) {
+      final delta = notification.scrollDelta ?? 0;
+      if (delta == 0) {
+        return;
+      }
+      _scrollOffsetAccumulator += delta;
+      if (_scrollOffsetAccumulator >= _kAutoHideThreshold) {
+        _hideUi();
+        _scrollOffsetAccumulator = 0;
+      } else if (_scrollOffsetAccumulator <= -_kAutoHideThreshold) {
+        _showUi();
+        _scrollOffsetAccumulator = 0;
+      }
+    } else if (notification is UserScrollNotification &&
+        notification.direction == ScrollDirection.idle) {
+      _scrollOffsetAccumulator = 0;
+    }
+  }
+
   bool _handleScrollNotification(ScrollNotification notification) {
     if (!_verticalMode || _paths.isEmpty) {
       return false;
@@ -213,6 +325,7 @@ class _OfflineReaderScreenState extends State<OfflineReaderScreen> {
     if (notification.metrics.axis != Axis.vertical) {
       return false;
     }
+    _handleAutoHide(notification);
     if (notification is ScrollUpdateNotification ||
         notification is ScrollEndNotification ||
         notification is UserScrollNotification) {
