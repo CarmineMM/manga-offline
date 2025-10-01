@@ -38,10 +38,12 @@ import 'package:manga_offline/domain/usecases/update_source_selection.dart';
 import 'package:manga_offline/domain/usecases/watch_available_sources.dart';
 import 'package:manga_offline/domain/usecases/watch_download_queue.dart';
 import 'package:manga_offline/domain/usecases/watch_downloaded_mangas.dart';
+import 'package:manga_offline/domain/usecases/watch_followed_mangas.dart';
+import 'package:manga_offline/domain/usecases/set_manga_followed.dart';
 import 'package:manga_offline/domain/usecases/queue_chapter_download.dart';
 import 'package:manga_offline/domain/usecases/queue_manga_download.dart';
 import 'package:manga_offline/presentation/blocs/debug/debug_log_cubit.dart';
-import 'package:manga_offline/presentation/blocs/downloads/downloads_cubit.dart';
+import 'package:manga_offline/presentation/blocs/followed/followed_cubit.dart';
 import 'package:manga_offline/presentation/blocs/library/library_cubit.dart';
 import 'package:manga_offline/presentation/blocs/manga_detail/manga_detail_cubit.dart';
 import 'package:manga_offline/presentation/blocs/sources/sources_cubit.dart';
@@ -156,6 +158,7 @@ Future<void> configureDependencies() async {
     ..registerSingleton<ReaderPreferences>(readerPrefs)
     ..registerLazySingleton(() => WatchDownloadedMangas(serviceLocator()))
     ..registerLazySingleton(() => WatchDownloadQueue(serviceLocator()))
+    ..registerLazySingleton(() => WatchFollowedMangas(serviceLocator()))
     ..registerLazySingleton(() => FetchMangaDetail(serviceLocator()))
     ..registerLazySingleton(() => FetchChapterPages(serviceLocator()))
     ..registerLazySingleton(() => FetchSourceCatalog(serviceLocator()))
@@ -167,13 +170,14 @@ Future<void> configureDependencies() async {
     ..registerLazySingleton(() => GetSourceLastSync(serviceLocator()))
     ..registerLazySingleton(() => QueueChapterDownload(serviceLocator()))
     ..registerLazySingleton(() => QueueMangaDownload(serviceLocator()))
+    ..registerLazySingleton(() => SetMangaFollowed(serviceLocator()))
     ..registerLazySingleton(
       () => DeleteDownloadedChapter(
         mangaRepository: serviceLocator(),
         downloadRepository: serviceLocator(),
       ),
     )
-    ..registerFactory(() => DownloadsCubit(serviceLocator()))
+    ..registerFactory(() => FollowedCubit(serviceLocator()))
     ..registerFactory(() => LibraryCubit(serviceLocator()))
     ..registerFactory(() => DebugLogCubit(serviceLocator()))
     ..registerFactory(
@@ -182,6 +186,7 @@ Future<void> configureDependencies() async {
         watchDownloadedMangas: serviceLocator(),
         queueChapterDownload: serviceLocator(),
         deleteDownloadedChapter: serviceLocator(),
+        setMangaFollowed: serviceLocator(),
         readingProgressDataSource: serviceLocator(),
       ),
     )

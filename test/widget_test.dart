@@ -44,16 +44,14 @@ void main() {
     expect(find.text('Biblioteca'), findsWidgets);
   });
 
-  testWidgets('Allows navigating to downloads tab', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('Allows navigating to followed tab', (WidgetTester tester) async {
     await tester.pumpWidget(const MangaOfflineApp());
 
-    await tester.tap(find.text('Descargas'));
+    await tester.tap(find.text('Seguidos'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Descargas'), findsWidgets);
+    expect(find.text('Seguidos'), findsWidgets);
     expect(find.text('Tu biblioteca offline'), findsNothing);
   });
 }

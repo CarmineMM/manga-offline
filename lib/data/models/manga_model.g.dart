@@ -42,44 +42,49 @@ const MangaModelSchema = CollectionSchema(
       name: r'isFavorite',
       type: IsarType.bool,
     ),
-    r'lastUpdated': PropertySchema(
+    r'isFollowed': PropertySchema(
       id: 5,
+      name: r'isFollowed',
+      type: IsarType.bool,
+    ),
+    r'lastUpdated': PropertySchema(
+      id: 6,
       name: r'lastUpdated',
       type: IsarType.dateTime,
     ),
     r'referenceId': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'referenceId',
       type: IsarType.string,
     ),
     r'sourceId': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'sourceId',
       type: IsarType.string,
     ),
     r'sourceName': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'sourceName',
       type: IsarType.string,
     ),
     r'status': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'status',
       type: IsarType.string,
       enumMap: _MangaModelstatusEnumValueMap,
     ),
     r'synopsis': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'synopsis',
       type: IsarType.string,
     ),
     r'title': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'title',
       type: IsarType.string,
     ),
     r'totalChapters': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'totalChapters',
       type: IsarType.long,
     )
@@ -167,14 +172,15 @@ void _mangaModelSerialize(
   writer.writeString(offsets[2], object.coverImageUrl);
   writer.writeLong(offsets[3], object.downloadedChapters);
   writer.writeBool(offsets[4], object.isFavorite);
-  writer.writeDateTime(offsets[5], object.lastUpdated);
-  writer.writeString(offsets[6], object.referenceId);
-  writer.writeString(offsets[7], object.sourceId);
-  writer.writeString(offsets[8], object.sourceName);
-  writer.writeString(offsets[9], object.status.name);
-  writer.writeString(offsets[10], object.synopsis);
-  writer.writeString(offsets[11], object.title);
-  writer.writeLong(offsets[12], object.totalChapters);
+  writer.writeBool(offsets[5], object.isFollowed);
+  writer.writeDateTime(offsets[6], object.lastUpdated);
+  writer.writeString(offsets[7], object.referenceId);
+  writer.writeString(offsets[8], object.sourceId);
+  writer.writeString(offsets[9], object.sourceName);
+  writer.writeString(offsets[10], object.status.name);
+  writer.writeString(offsets[11], object.synopsis);
+  writer.writeString(offsets[12], object.title);
+  writer.writeLong(offsets[13], object.totalChapters);
 }
 
 MangaModel _mangaModelDeserialize(
@@ -190,16 +196,17 @@ MangaModel _mangaModelDeserialize(
   object.downloadedChapters = reader.readLong(offsets[3]);
   object.id = id;
   object.isFavorite = reader.readBool(offsets[4]);
-  object.lastUpdated = reader.readDateTimeOrNull(offsets[5]);
-  object.referenceId = reader.readString(offsets[6]);
-  object.sourceId = reader.readString(offsets[7]);
-  object.sourceName = reader.readStringOrNull(offsets[8]);
+  object.isFollowed = reader.readBool(offsets[5]);
+  object.lastUpdated = reader.readDateTimeOrNull(offsets[6]);
+  object.referenceId = reader.readString(offsets[7]);
+  object.sourceId = reader.readString(offsets[8]);
+  object.sourceName = reader.readStringOrNull(offsets[9]);
   object.status =
-      _MangaModelstatusValueEnumMap[reader.readStringOrNull(offsets[9])] ??
+      _MangaModelstatusValueEnumMap[reader.readStringOrNull(offsets[10])] ??
           DownloadStatus.notDownloaded;
-  object.synopsis = reader.readStringOrNull(offsets[10]);
-  object.title = reader.readString(offsets[11]);
-  object.totalChapters = reader.readLong(offsets[12]);
+  object.synopsis = reader.readStringOrNull(offsets[11]);
+  object.title = reader.readString(offsets[12]);
+  object.totalChapters = reader.readLong(offsets[13]);
   return object;
 }
 
@@ -221,21 +228,23 @@ P _mangaModelDeserializeProp<P>(
     case 4:
       return (reader.readBool(offset)) as P;
     case 5:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 6:
-      return (reader.readString(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 7:
       return (reader.readString(offset)) as P;
     case 8:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 9:
+      return (reader.readStringOrNull(offset)) as P;
+    case 10:
       return (_MangaModelstatusValueEnumMap[reader.readStringOrNull(offset)] ??
           DownloadStatus.notDownloaded) as P;
-    case 10:
-      return (reader.readStringOrNull(offset)) as P;
     case 11:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 12:
+      return (reader.readString(offset)) as P;
+    case 13:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1112,6 +1121,16 @@ extension MangaModelQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
         property: r'isFavorite',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<MangaModel, MangaModel, QAfterFilterCondition> isFollowedEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isFollowed',
         value: value,
       ));
     });
@@ -2143,6 +2162,18 @@ extension MangaModelQuerySortBy
     });
   }
 
+  QueryBuilder<MangaModel, MangaModel, QAfterSortBy> sortByIsFollowed() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isFollowed', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MangaModel, MangaModel, QAfterSortBy> sortByIsFollowedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isFollowed', Sort.desc);
+    });
+  }
+
   QueryBuilder<MangaModel, MangaModel, QAfterSortBy> sortByLastUpdated() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastUpdated', Sort.asc);
@@ -2305,6 +2336,18 @@ extension MangaModelQuerySortThenBy
     });
   }
 
+  QueryBuilder<MangaModel, MangaModel, QAfterSortBy> thenByIsFollowed() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isFollowed', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MangaModel, MangaModel, QAfterSortBy> thenByIsFollowedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isFollowed', Sort.desc);
+    });
+  }
+
   QueryBuilder<MangaModel, MangaModel, QAfterSortBy> thenByLastUpdated() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastUpdated', Sort.asc);
@@ -2439,6 +2482,12 @@ extension MangaModelQueryWhereDistinct
     });
   }
 
+  QueryBuilder<MangaModel, MangaModel, QDistinct> distinctByIsFollowed() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isFollowed');
+    });
+  }
+
   QueryBuilder<MangaModel, MangaModel, QDistinct> distinctByLastUpdated() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lastUpdated');
@@ -2530,6 +2579,12 @@ extension MangaModelQueryProperty
   QueryBuilder<MangaModel, bool, QQueryOperations> isFavoriteProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isFavorite');
+    });
+  }
+
+  QueryBuilder<MangaModel, bool, QQueryOperations> isFollowedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isFollowed');
     });
   }
 

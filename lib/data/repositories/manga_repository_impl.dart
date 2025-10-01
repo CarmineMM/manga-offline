@@ -41,6 +41,14 @@ class MangaRepositoryImpl implements MangaRepository {
   }
 
   @override
+  Stream<List<Manga>> watchFollowedMangas() {
+    return watchLocalLibrary().map(
+      (mangas) =>
+          mangas.where((manga) => manga.isFollowed).toList(growable: false),
+    );
+  }
+
+  @override
   Future<void> saveManga(Manga manga) {
     final model = MangaModel.fromEntity(manga);
     final chapters = manga.chapters
@@ -129,5 +137,13 @@ class MangaRepositoryImpl implements MangaRepository {
   @override
   Future<void> clearChapterDownload(String chapterId) {
     return _localDataSource.clearChapterDownload(chapterId);
+  }
+
+  @override
+  Future<void> setMangaFollowed({
+    required String mangaId,
+    required bool isFollowed,
+  }) {
+    return _localDataSource.setMangaFollowed(mangaId, isFollowed);
   }
 }

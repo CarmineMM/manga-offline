@@ -36,11 +36,34 @@ class InMemoryMangaRepository implements MangaRepository {
   Stream<List<Manga>> watchLocalLibrary() => _controller.stream;
 
   @override
+  Stream<List<Manga>> watchFollowedMangas() => _controller.stream.map(
+    (mangas) =>
+        mangas.where((manga) => manga.isFollowed).toList(growable: false),
+  );
+
+  @override
   Future<Manga?> getManga(String mangaId) async => _mangas[mangaId];
 
   @override
   Future<void> saveManga(Manga manga) async {
-    _mangas[manga.id] = manga;
+    final existing = _mangas[manga.id];
+    final next = existing != null
+        ? manga.copyWith(isFollowed: existing.isFollowed)
+        : manga;
+    _mangas[manga.id] = next;
+    _emit();
+  }
+
+  @override
+  Future<void> setMangaFollowed({
+    required String mangaId,
+    required bool isFollowed,
+  }) async {
+    final existing = _mangas[mangaId];
+    if (existing == null) {
+      return;
+    }
+    _mangas[mangaId] = existing.copyWith(isFollowed: isFollowed);
     _emit();
   }
 

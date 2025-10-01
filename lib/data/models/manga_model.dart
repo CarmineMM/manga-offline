@@ -49,6 +49,9 @@ class MangaModel {
   /// Marks if the user favourited the manga.
   bool isFavorite = false;
 
+  /// Marks if the user is actively following the manga.
+  bool isFollowed = false;
+
   /// Chapter references tied to this manga.
   List<String> chapterIds = [];
 
@@ -67,6 +70,7 @@ class MangaModel {
         downloadedChapters: downloadedChapters,
         lastUpdated: lastUpdated,
         isFavorite: isFavorite,
+        isFollowed: isFollowed,
         chapters: chapters.map((chapter) => chapter.toEntity()).toList(),
       );
 
@@ -85,6 +89,7 @@ class MangaModel {
       ..downloadedChapters = manga.downloadedChapters
       ..lastUpdated = manga.lastUpdated
       ..isFavorite = manga.isFavorite
+      ..isFollowed = manga.isFollowed
       ..chapterIds = manga.chapters.map((chapter) => chapter.id).toList();
     return model;
   }

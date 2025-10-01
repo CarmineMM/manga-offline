@@ -39,6 +39,9 @@ class Manga {
   /// Flag to determine if the user marked the manga as favourite.
   final bool isFavorite;
 
+  /// Flag indicating whether the user is following this manga to track updates.
+  final bool isFollowed;
+
   /// Chapters already fetched for the manga (may be partial data).
   final List<Chapter> chapters;
 
@@ -56,6 +59,7 @@ class Manga {
     this.downloadedChapters = 0,
     this.lastUpdated,
     this.isFavorite = false,
+    this.isFollowed = false,
     this.chapters = const [],
   });
 
@@ -73,6 +77,7 @@ class Manga {
     int? downloadedChapters,
     DateTime? lastUpdated,
     bool? isFavorite,
+    bool? isFollowed,
     List<Chapter>? chapters,
   }) {
     return Manga(
@@ -88,6 +93,7 @@ class Manga {
       downloadedChapters: downloadedChapters ?? this.downloadedChapters,
       lastUpdated: lastUpdated ?? this.lastUpdated,
       isFavorite: isFavorite ?? this.isFavorite,
+      isFollowed: isFollowed ?? this.isFollowed,
       chapters: chapters ?? this.chapters,
     );
   }

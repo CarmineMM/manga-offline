@@ -331,6 +331,19 @@ class MangaLocalDataSource {
     });
   }
 
+  /// Updates the follow flag for the provided manga identifier.
+  Future<void> setMangaFollowed(String referenceId, bool isFollowed) async {
+    await isar.writeTxn(() async {
+      final manga = await getManga(referenceId);
+      if (manga == null) {
+        return;
+      }
+      manga.isFollowed = isFollowed;
+      manga.lastUpdated = DateTime.now();
+      await _mangaCollection.put(manga);
+    });
+  }
+
   Future<void> _deleteChaptersForManga(String referenceId) async {
     final query = _chapterCollection.buildQuery<ChapterModel>(
       filter: FilterCondition.equalTo(

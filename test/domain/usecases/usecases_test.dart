@@ -179,11 +179,21 @@ class _FakeMangaRepository implements MangaRepository {
   Stream<List<Manga>> watchLocalLibrary() => _controller.stream;
 
   @override
+  Stream<List<Manga>> watchFollowedMangas() => _controller.stream.map(
+    (mangas) =>
+        mangas.where((manga) => manga.isFollowed).toList(growable: false),
+  );
+
+  @override
   Future<Manga?> getManga(String mangaId) async => _stored[mangaId];
 
   @override
   Future<void> saveManga(Manga manga) async {
-    _stored[manga.id] = manga;
+    final existing = _stored[manga.id];
+    final next = existing != null
+        ? manga.copyWith(isFollowed: existing.isFollowed)
+        : manga;
+    _stored[manga.id] = next;
     _mangaStatuses[manga.id] = manga.status;
     _controller.add(_stored.values.toList());
   }
@@ -218,6 +228,19 @@ class _FakeMangaRepository implements MangaRepository {
     }
 
     _chapterStatuses[chapter.id] = chapter.status;
+    _controller.add(_stored.values.toList());
+  }
+
+  @override
+  Future<void> setMangaFollowed({
+    required String mangaId,
+    required bool isFollowed,
+  }) async {
+    final existing = _stored[mangaId];
+    if (existing == null) {
+      return;
+    }
+    _stored[mangaId] = existing.copyWith(isFollowed: isFollowed);
     _controller.add(_stored.values.toList());
   }
 

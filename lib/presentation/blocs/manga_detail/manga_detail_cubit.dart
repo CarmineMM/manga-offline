@@ -9,6 +9,7 @@ import 'package:manga_offline/domain/usecases/fetch_manga_detail.dart';
 import 'package:manga_offline/domain/usecases/queue_chapter_download.dart';
 import 'package:manga_offline/domain/usecases/delete_downloaded_chapter.dart';
 import 'package:manga_offline/domain/usecases/watch_downloaded_mangas.dart';
+import 'package:manga_offline/domain/usecases/set_manga_followed.dart';
 import 'package:manga_offline/data/datasources/cache/reading_progress_datasource.dart';
 
 part 'manga_detail_state.dart';
@@ -21,11 +22,13 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
     required WatchDownloadedMangas watchDownloadedMangas,
     required QueueChapterDownload queueChapterDownload,
     required DeleteDownloadedChapter deleteDownloadedChapter,
+    required SetMangaFollowed setMangaFollowed,
     required ReadingProgressDataSource readingProgressDataSource,
   }) : _fetchMangaDetail = fetchMangaDetail,
        _watchDownloadedMangas = watchDownloadedMangas,
        _queueChapterDownload = queueChapterDownload,
        _deleteDownloadedChapter = deleteDownloadedChapter,
+       _setMangaFollowed = setMangaFollowed,
        _readingProgressDataSource = readingProgressDataSource,
        super(const MangaDetailState.initial());
 
@@ -33,6 +36,7 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
   final WatchDownloadedMangas _watchDownloadedMangas;
   final QueueChapterDownload _queueChapterDownload;
   final DeleteDownloadedChapter _deleteDownloadedChapter;
+  final SetMangaFollowed _setMangaFollowed;
   final ReadingProgressDataSource _readingProgressDataSource;
 
   StreamSubscription<List<Manga>>? _librarySubscription;
@@ -107,6 +111,7 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
     if (!identical(current, next) &&
         (current.downloadedChapters != next.downloadedChapters ||
             current.status != next.status ||
+            current.isFollowed != next.isFollowed ||
             !_chaptersEquivalent(current.chapters, next.chapters))) {
       return true;
     }
@@ -133,6 +138,27 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
       }
     }
     return true;
+  }
+
+  /// Alterna el estado de seguimiento del manga actual.
+  Future<void> toggleFollowed() async {
+    final current = state.manga;
+    if (current == null) {
+      return;
+    }
+
+    final nextFollowed = !current.isFollowed;
+    try {
+      await _setMangaFollowed(mangaId: current.id, isFollowed: nextFollowed);
+      emit(state.copyWith(manga: current.copyWith(isFollowed: nextFollowed)));
+    } catch (_) {
+      emit(
+        state.copyWith(
+          errorMessage:
+              'No se pudo actualizar tu seguimiento. Intenta más tarde.',
+        ),
+      );
+    }
   }
 
   bool _dateEquals(DateTime? a, DateTime? b) {

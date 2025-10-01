@@ -96,6 +96,7 @@ class _ChapterListView extends StatelessWidget {
             chapters: chapters,
             status: state.status,
             filter: state.filter,
+            canToggleFollow: loaded,
           ),
         );
       },
@@ -109,12 +110,14 @@ class _ChapterListBody extends StatelessWidget {
     required this.chapters,
     required this.status,
     required this.filter,
+    required this.canToggleFollow,
   });
 
   final Manga manga;
   final List<Chapter> chapters;
   final MangaDetailStatus status;
   final ChapterFilter filter;
+  final bool canToggleFollow;
 
   @override
   Widget build(BuildContext context) {
@@ -122,7 +125,9 @@ class _ChapterListBody extends StatelessWidget {
       slivers: <Widget>[
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
-          sliver: SliverToBoxAdapter(child: _MangaHeader(manga: manga)),
+          sliver: SliverToBoxAdapter(
+            child: _MangaHeader(manga: manga, canToggleFollow: canToggleFollow),
+          ),
         ),
         switch (status) {
           MangaDetailStatus.initial ||
@@ -251,14 +256,16 @@ class _ChapterListBody extends StatelessWidget {
 }
 
 class _MangaHeader extends StatelessWidget {
-  const _MangaHeader({required this.manga});
+  const _MangaHeader({required this.manga, required this.canToggleFollow});
 
   final Manga manga;
+  final bool canToggleFollow;
 
   @override
   Widget build(BuildContext context) {
     final coverPath = manga.coverImagePath;
     final coverUrl = manga.coverImageUrl;
+    final detailCubit = context.read<MangaDetailCubit>();
 
     return _MangaHeaderLayout(
       coverImagePath: coverPath,
@@ -267,6 +274,10 @@ class _MangaHeader extends StatelessWidget {
       sourceLabel: _resolveSourceLabel(manga),
       synopsis: manga.synopsis,
       totalChapters: manga.totalChapters,
+      isFollowed: manga.isFollowed,
+      onToggleFollow: canToggleFollow
+          ? () => detailCubit.toggleFollowed()
+          : null,
     );
   }
 
@@ -288,6 +299,8 @@ class _MangaHeaderLayout extends StatefulWidget {
     required this.sourceLabel,
     required this.synopsis,
     required this.totalChapters,
+    required this.isFollowed,
+    required this.onToggleFollow,
   });
 
   final String? coverImagePath;
@@ -296,6 +309,8 @@ class _MangaHeaderLayout extends StatefulWidget {
   final String sourceLabel;
   final String? synopsis;
   final int totalChapters;
+  final bool isFollowed;
+  final VoidCallback? onToggleFollow;
 
   @override
   State<_MangaHeaderLayout> createState() => _MangaHeaderLayoutState();
@@ -357,6 +372,21 @@ class _MangaHeaderLayoutState extends State<_MangaHeaderLayout> {
                         '${widget.totalChapters} capítulos',
                         style: textTheme.labelLarge,
                       ),
+                    ),
+                  if (widget.onToggleFollow != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: widget.isFollowed
+                          ? FilledButton.icon(
+                              onPressed: widget.onToggleFollow,
+                              icon: const Icon(Icons.favorite),
+                              label: const Text('Dejar de seguir'),
+                            )
+                          : OutlinedButton.icon(
+                              onPressed: widget.onToggleFollow,
+                              icon: const Icon(Icons.favorite_border),
+                              label: const Text('Seguir'),
+                            ),
                     ),
                 ],
               ),

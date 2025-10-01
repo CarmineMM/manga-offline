@@ -42,18 +42,23 @@ const MangaSourceModelSchema = CollectionSchema(
       name: r'isEnabled',
       type: IsarType.bool,
     ),
-    r'locale': PropertySchema(
+    r'lastSyncedAt': PropertySchema(
       id: 5,
+      name: r'lastSyncedAt',
+      type: IsarType.dateTime,
+    ),
+    r'locale': PropertySchema(
+      id: 6,
       name: r'locale',
       type: IsarType.string,
     ),
     r'name': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'name',
       type: IsarType.string,
     ),
     r'referenceId': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'referenceId',
       type: IsarType.string,
     )
@@ -129,9 +134,10 @@ void _mangaSourceModelSerialize(
   writer.writeString(offsets[2], object.description);
   writer.writeString(offsets[3], object.iconUrl);
   writer.writeBool(offsets[4], object.isEnabled);
-  writer.writeString(offsets[5], object.locale);
-  writer.writeString(offsets[6], object.name);
-  writer.writeString(offsets[7], object.referenceId);
+  writer.writeDateTime(offsets[5], object.lastSyncedAt);
+  writer.writeString(offsets[6], object.locale);
+  writer.writeString(offsets[7], object.name);
+  writer.writeString(offsets[8], object.referenceId);
 }
 
 MangaSourceModel _mangaSourceModelDeserialize(
@@ -147,9 +153,10 @@ MangaSourceModel _mangaSourceModelDeserialize(
   object.iconUrl = reader.readStringOrNull(offsets[3]);
   object.id = id;
   object.isEnabled = reader.readBool(offsets[4]);
-  object.locale = reader.readString(offsets[5]);
-  object.name = reader.readString(offsets[6]);
-  object.referenceId = reader.readString(offsets[7]);
+  object.lastSyncedAt = reader.readDateTimeOrNull(offsets[5]);
+  object.locale = reader.readString(offsets[6]);
+  object.name = reader.readString(offsets[7]);
+  object.referenceId = reader.readString(offsets[8]);
   return object;
 }
 
@@ -171,10 +178,12 @@ P _mangaSourceModelDeserializeProp<P>(
     case 4:
       return (reader.readBool(offset)) as P;
     case 5:
-      return (reader.readString(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 6:
       return (reader.readString(offset)) as P;
     case 7:
+      return (reader.readString(offset)) as P;
+    case 8:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1131,6 +1140,80 @@ extension MangaSourceModelQueryFilter
   }
 
   QueryBuilder<MangaSourceModel, MangaSourceModel, QAfterFilterCondition>
+      lastSyncedAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'lastSyncedAt',
+      ));
+    });
+  }
+
+  QueryBuilder<MangaSourceModel, MangaSourceModel, QAfterFilterCondition>
+      lastSyncedAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'lastSyncedAt',
+      ));
+    });
+  }
+
+  QueryBuilder<MangaSourceModel, MangaSourceModel, QAfterFilterCondition>
+      lastSyncedAtEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lastSyncedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<MangaSourceModel, MangaSourceModel, QAfterFilterCondition>
+      lastSyncedAtGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'lastSyncedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<MangaSourceModel, MangaSourceModel, QAfterFilterCondition>
+      lastSyncedAtLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'lastSyncedAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<MangaSourceModel, MangaSourceModel, QAfterFilterCondition>
+      lastSyncedAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'lastSyncedAt',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<MangaSourceModel, MangaSourceModel, QAfterFilterCondition>
       localeEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -1604,6 +1687,20 @@ extension MangaSourceModelQuerySortBy
   }
 
   QueryBuilder<MangaSourceModel, MangaSourceModel, QAfterSortBy>
+      sortByLastSyncedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastSyncedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MangaSourceModel, MangaSourceModel, QAfterSortBy>
+      sortByLastSyncedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastSyncedAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MangaSourceModel, MangaSourceModel, QAfterSortBy>
       sortByLocale() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'locale', Sort.asc);
@@ -1717,6 +1814,20 @@ extension MangaSourceModelQuerySortThenBy
   }
 
   QueryBuilder<MangaSourceModel, MangaSourceModel, QAfterSortBy>
+      thenByLastSyncedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastSyncedAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MangaSourceModel, MangaSourceModel, QAfterSortBy>
+      thenByLastSyncedAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastSyncedAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MangaSourceModel, MangaSourceModel, QAfterSortBy>
       thenByLocale() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'locale', Sort.asc);
@@ -1795,6 +1906,13 @@ extension MangaSourceModelQueryWhereDistinct
     });
   }
 
+  QueryBuilder<MangaSourceModel, MangaSourceModel, QDistinct>
+      distinctByLastSyncedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lastSyncedAt');
+    });
+  }
+
   QueryBuilder<MangaSourceModel, MangaSourceModel, QDistinct> distinctByLocale(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -1854,6 +1972,13 @@ extension MangaSourceModelQueryProperty
   QueryBuilder<MangaSourceModel, bool, QQueryOperations> isEnabledProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isEnabled');
+    });
+  }
+
+  QueryBuilder<MangaSourceModel, DateTime?, QQueryOperations>
+      lastSyncedAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastSyncedAt');
     });
   }
 

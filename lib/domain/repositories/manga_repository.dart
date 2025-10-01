@@ -7,6 +7,9 @@ abstract interface class MangaRepository {
   /// Streams the locally stored mangas, keeping presentation layer reactive.
   Stream<List<Manga>> watchLocalLibrary();
 
+  /// Streams the mangas followed by the user.
+  Stream<List<Manga>> watchFollowedMangas();
+
   /// Persists downloaded manga metadata locally.
   Future<void> saveManga(Manga manga);
 
@@ -42,4 +45,10 @@ abstract interface class MangaRepository {
   /// Clears the persisted download state for the provided chapter, removing
   /// any cached assets and refreshing parent counters.
   Future<void> clearChapterDownload(String chapterId);
+
+  /// Updates whether the user is following the manga identified by [mangaId].
+  Future<void> setMangaFollowed({
+    required String mangaId,
+    required bool isFollowed,
+  });
 }

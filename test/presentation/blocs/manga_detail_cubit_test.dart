@@ -10,6 +10,7 @@ import 'package:manga_offline/domain/usecases/fetch_manga_detail.dart';
 import 'package:manga_offline/domain/usecases/queue_chapter_download.dart';
 import 'package:manga_offline/domain/usecases/delete_downloaded_chapter.dart';
 import 'package:manga_offline/domain/usecases/watch_downloaded_mangas.dart';
+import 'package:manga_offline/domain/usecases/set_manga_followed.dart';
 import 'package:manga_offline/presentation/blocs/manga_detail/manga_detail_cubit.dart';
 
 class _FakeDownloadRepository implements DownloadRepository {
@@ -49,6 +50,7 @@ void main() {
     late WatchDownloadedMangas watchDownloadedMangas;
     late QueueChapterDownload queueChapterDownload;
     late DeleteDownloadedChapter deleteDownloadedChapter;
+    late SetMangaFollowed setMangaFollowed;
     late _FakeDownloadRepository downloadRepository;
     late ReadingProgressDataSource progressDataSource;
     late MangaDetailCubit cubit;
@@ -58,6 +60,7 @@ void main() {
       catalogRepository = InMemoryCatalogRepository(mangaRepository);
       fetchMangaDetail = FetchMangaDetail(catalogRepository);
       watchDownloadedMangas = WatchDownloadedMangas(mangaRepository);
+      setMangaFollowed = SetMangaFollowed(mangaRepository);
       downloadRepository = _FakeDownloadRepository();
       queueChapterDownload = QueueChapterDownload(downloadRepository);
       deleteDownloadedChapter = DeleteDownloadedChapter(
@@ -70,6 +73,7 @@ void main() {
         watchDownloadedMangas: watchDownloadedMangas,
         queueChapterDownload: queueChapterDownload,
         deleteDownloadedChapter: deleteDownloadedChapter,
+        setMangaFollowed: setMangaFollowed,
         readingProgressDataSource: progressDataSource,
       );
     });
@@ -137,6 +141,32 @@ void main() {
 
       final stored = await progressDataSource.getProgress(chapter.id);
       expect(stored, isNull);
+    });
+
+    test('toggleFollowed updates state and repository', () async {
+      await catalogRepository.syncCatalog(sourceId: 'olympus');
+      await cubit.load(
+        sourceId: 'olympus',
+        mangaId: 'academia-de-la-ascension',
+      );
+
+      expect(cubit.state.manga!.isFollowed, isFalse);
+
+      await cubit.toggleFollowed();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(cubit.state.manga!.isFollowed, isTrue);
+      final stored = await mangaRepository.getManga('academia-de-la-ascension');
+      expect(stored?.isFollowed, isTrue);
+
+      await cubit.toggleFollowed();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(cubit.state.manga!.isFollowed, isFalse);
+      final toggledOff = await mangaRepository.getManga(
+        'academia-de-la-ascension',
+      );
+      expect(toggledOff?.isFollowed, isFalse);
     });
 
     test(
