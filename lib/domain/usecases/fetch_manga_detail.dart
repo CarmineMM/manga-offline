@@ -9,7 +9,15 @@ class FetchMangaDetail {
   final CatalogRepository _repository;
 
   /// Executes the use case.
-  Future<Manga> call({required String sourceId, required String mangaId}) {
-    return _repository.fetchMangaDetail(sourceId: sourceId, mangaId: mangaId);
+  Future<Manga> call({
+    required String sourceId,
+    required String mangaId,
+    bool forceRefresh = false,
+  }) {
+    return _repository.fetchMangaDetail(
+      sourceId: sourceId,
+      mangaId: mangaId,
+      forceRefresh: forceRefresh,
+    );
   }
 }

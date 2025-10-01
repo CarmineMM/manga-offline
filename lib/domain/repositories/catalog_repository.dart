@@ -13,6 +13,7 @@ abstract interface class CatalogRepository {
   Future<Manga> fetchMangaDetail({
     required String sourceId,
     required String mangaId,
+    bool forceRefresh = false,
   });
 
   /// Fetches the list of page images for a specific chapter.

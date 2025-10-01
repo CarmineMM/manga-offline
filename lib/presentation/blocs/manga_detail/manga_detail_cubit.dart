@@ -43,7 +43,7 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
 
   /// Loads the detail for [mangaId] from the provided [sourceId].
   Future<void> load({required String sourceId, required String mangaId}) async {
-    emit(state.copyWith(status: MangaDetailStatus.loading));
+    emit(state.copyWith(status: MangaDetailStatus.loading, isReloading: false));
     try {
       final manga = await _fetchMangaDetail(
         sourceId: sourceId,
@@ -62,6 +62,7 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
           manga: hydrated,
           errorMessage: null,
           visibleChapters: visible,
+          isReloading: false,
         ),
       );
       await _subscribeToMangaUpdates(mangaId);
@@ -70,6 +71,7 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
         state.copyWith(
           status: MangaDetailStatus.failure,
           errorMessage: error.toString(),
+          isReloading: false,
         ),
       );
     }
@@ -99,6 +101,7 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
           sortOrder: state.sortOrder,
           filter: state.filter,
         ),
+        isReloading: false,
       ),
     );
   }
@@ -156,6 +159,45 @@ class MangaDetailCubit extends Cubit<MangaDetailState> {
         state.copyWith(
           errorMessage:
               'No se pudo actualizar tu seguimiento. Intenta más tarde.',
+        ),
+      );
+    }
+  }
+
+  /// Forzará una recarga desde la fuente remota manteniendo los datos locales.
+  Future<void> reload() async {
+    final current = state.manga;
+    if (current == null) {
+      return;
+    }
+
+    emit(state.copyWith(isReloading: true));
+    try {
+      final manga = await _fetchMangaDetail(
+        sourceId: current.sourceId,
+        mangaId: current.id,
+        forceRefresh: true,
+      );
+      final hydrated = await _mergeProgress(manga);
+      emit(
+        state.copyWith(
+          status: MangaDetailStatus.success,
+          manga: hydrated,
+          visibleChapters: _composeVisibleChapters(
+            hydrated.chapters,
+            sortOrder: state.sortOrder,
+            filter: state.filter,
+          ),
+          errorMessage: null,
+          isReloading: false,
+        ),
+      );
+    } catch (error) {
+      emit(
+        state.copyWith(
+          errorMessage:
+              'No se pudo recargar los datos. Verifica tu conexión e inténtalo nuevamente.',
+          isReloading: false,
         ),
       );
     }

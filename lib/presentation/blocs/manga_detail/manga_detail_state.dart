@@ -19,6 +19,7 @@ class MangaDetailState extends Equatable {
     this.sortOrder = ChapterSortOrder.ascending,
     this.filter = ChapterFilter.all,
     this.visibleChapters = const <Chapter>[],
+    this.isReloading = false,
   });
 
   /// Convenience factory for the initial state.
@@ -28,7 +29,8 @@ class MangaDetailState extends Equatable {
       errorMessage = null,
       sortOrder = ChapterSortOrder.ascending,
       filter = ChapterFilter.all,
-      visibleChapters = const <Chapter>[];
+      visibleChapters = const <Chapter>[],
+      isReloading = false;
 
   /// Current loading status.
   final MangaDetailStatus status;
@@ -48,6 +50,9 @@ class MangaDetailState extends Equatable {
   /// Chapters exposed to the presentation layer using [sortOrder].
   final List<Chapter> visibleChapters;
 
+  /// Indicates when a manual reload is in progress while keeping cached data.
+  final bool isReloading;
+
   /// Creates a copy with updated fields.
   MangaDetailState copyWith({
     MangaDetailStatus? status,
@@ -57,6 +62,7 @@ class MangaDetailState extends Equatable {
     ChapterSortOrder? sortOrder,
     ChapterFilter? filter,
     List<Chapter>? visibleChapters,
+    bool? isReloading,
   }) {
     return MangaDetailState(
       status: status ?? this.status,
@@ -65,6 +71,7 @@ class MangaDetailState extends Equatable {
       sortOrder: sortOrder ?? this.sortOrder,
       filter: filter ?? this.filter,
       visibleChapters: visibleChapters ?? this.visibleChapters,
+      isReloading: isReloading ?? this.isReloading,
     );
   }
 
@@ -76,5 +83,6 @@ class MangaDetailState extends Equatable {
     sortOrder,
     filter,
     visibleChapters,
+    isReloading,
   ];
 }

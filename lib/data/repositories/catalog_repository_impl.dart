@@ -98,19 +98,35 @@ class CatalogRepositoryImpl implements CatalogRepository {
   Future<Manga> fetchMangaDetail({
     required String sourceId,
     required String mangaId,
+    bool forceRefresh = false,
   }) async {
-    final remote = _resolveRemote(sourceId);
     final existingModel = await _localDataSource.getManga(mangaId);
     final existingChapterModels = await _localDataSource.getChaptersForManga(
       mangaId,
     );
-    final existingChaptersById = <String, Chapter>{};
+
+    final existingChapters = <Chapter>[];
     for (final model in existingChapterModels) {
       final pages = await _localDataSource.getPagesForChapter(
         model.referenceId,
       );
-      existingChaptersById[model.referenceId] = model.toEntity(pages: pages);
+      existingChapters.add(model.toEntity(pages: pages));
     }
+
+    final hasLocalDetail =
+        existingModel != null && existingChapters.isNotEmpty && !forceRefresh;
+    if (hasLocalDetail) {
+      final base = existingModel.toEntity();
+      final total = base.totalChapters != 0
+          ? base.totalChapters
+          : existingChapters.length;
+      return base.copyWith(chapters: existingChapters, totalChapters: total);
+    }
+
+    final remote = _resolveRemote(sourceId);
+    final existingChaptersById = <String, Chapter>{
+      for (final chapter in existingChapters) chapter.id: chapter,
+    };
 
     List<RemoteChapterSummary> remoteChapters = const <RemoteChapterSummary>[];
     Object? remoteError;
@@ -131,9 +147,9 @@ class CatalogRepositoryImpl implements CatalogRepository {
     if (remoteError != null) {
       if (existingModel != null) {
         final base = existingModel.toEntity();
-        final cachedChapters = existingChaptersById.values.toList(
-          growable: false,
-        );
+        final cachedChapters = existingChapters.isNotEmpty
+            ? existingChapters
+            : existingChaptersById.values.toList(growable: false);
         return base.copyWith(
           chapters: cachedChapters,
           totalChapters: base.totalChapters != 0
@@ -151,7 +167,10 @@ class CatalogRepositoryImpl implements CatalogRepository {
       if (existingModel != null) {
         final base = existingModel.toEntity();
         return base.copyWith(
-          chapters: existingChaptersById.values.toList(growable: false),
+          chapters: existingChapters,
+          totalChapters: base.totalChapters != 0
+              ? base.totalChapters
+              : existingChapters.length,
         );
       }
       return Manga(
@@ -164,9 +183,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
     }
 
     final baseManga = existingModel != null
-        ? existingModel.toEntity().copyWith(
-            chapters: existingChaptersById.values.toList(growable: false),
-          )
+        ? existingModel.toEntity().copyWith(chapters: existingChapters)
         : Manga(
             id: mangaId,
             sourceId: sourceId,

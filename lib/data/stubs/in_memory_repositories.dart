@@ -306,6 +306,7 @@ class InMemoryCatalogRepository implements CatalogRepository {
   final Map<String, List<PageImage>> _pagesByChapter =
       <String, List<PageImage>>{};
   final PageCacheDataSource? _pageCache;
+  bool? lastForceRefresh;
 
   @override
   Future<void> syncCatalog({required String sourceId}) async {
@@ -361,7 +362,14 @@ class InMemoryCatalogRepository implements CatalogRepository {
   Future<Manga> fetchMangaDetail({
     required String sourceId,
     required String mangaId,
+    bool forceRefresh = false,
   }) async {
+    lastForceRefresh = forceRefresh;
+    final cached = await _mangaRepository.getManga(mangaId);
+    if (!forceRefresh && cached != null && cached.chapters.isNotEmpty) {
+      return cached;
+    }
+
     final list = _catalogBySource[sourceId] ?? const <Manga>[];
     final summary = list.firstWhere(
       (manga) => manga.id == mangaId,
@@ -369,7 +377,10 @@ class InMemoryCatalogRepository implements CatalogRepository {
           Manga(id: mangaId, sourceId: sourceId, title: 'Manga desconocido'),
     );
 
-    List<Chapter> chapters;
+    List<Chapter> chapters = const <Chapter>[];
+    if (!forceRefresh) {
+      chapters = _chaptersByManga[mangaId] ?? const <Chapter>[];
+    }
     final remote = _remoteDataSources[sourceId];
     if (remote != null) {
       try {
@@ -390,14 +401,20 @@ class InMemoryCatalogRepository implements CatalogRepository {
           error: error,
           stackTrace: stack,
         );
+        if (chapters.isEmpty) {
+          chapters =
+              (cached?.chapters.isNotEmpty == true
+                  ? cached!.chapters
+                  : _chaptersByManga[mangaId]) ??
+              _buildChaptersForManga(mangaId: mangaId, sourceId: sourceId);
+        }
+      }
+    } else {
+      if (chapters.isEmpty) {
         chapters =
             _chaptersByManga[mangaId] ??
             _buildChaptersForManga(mangaId: mangaId, sourceId: sourceId);
       }
-    } else {
-      chapters =
-          _chaptersByManga[mangaId] ??
-          _buildChaptersForManga(mangaId: mangaId, sourceId: sourceId);
     }
 
     _chaptersByManga[mangaId] = chapters;

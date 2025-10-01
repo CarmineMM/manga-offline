@@ -72,6 +72,7 @@ class _FakeCatalogRepository implements CatalogRepository {
   String? lastCatalogSource;
   String? lastDetailSource;
   String? lastDetailManga;
+  bool? lastForceRefresh;
   List<Manga> catalog = const [];
   Manga? detail;
   List<PageImage> pages = const [];
@@ -86,9 +87,11 @@ class _FakeCatalogRepository implements CatalogRepository {
   Future<Manga> fetchMangaDetail({
     required String sourceId,
     required String mangaId,
+    bool forceRefresh = false,
   }) async {
     lastDetailSource = sourceId;
     lastDetailManga = mangaId;
+    lastForceRefresh = forceRefresh;
     return detail!;
   }
 
@@ -419,7 +422,20 @@ void main() {
 
       expect(repository.lastDetailSource, equals('source-1'));
       expect(repository.lastDetailManga, equals('manga-1'));
+      expect(repository.lastForceRefresh, isFalse);
       expect(result.id, equals('manga-1'));
+    });
+
+    test('FetchMangaDetail forwards forceRefresh flag', () async {
+      final useCase = FetchMangaDetail(repository);
+
+      await useCase(
+        sourceId: 'source-1',
+        mangaId: 'manga-1',
+        forceRefresh: true,
+      );
+
+      expect(repository.lastForceRefresh, isTrue);
     });
   });
 

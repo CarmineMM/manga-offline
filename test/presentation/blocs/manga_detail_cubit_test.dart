@@ -169,6 +169,26 @@ void main() {
       expect(toggledOff?.isFollowed, isFalse);
     });
 
+    test('reload toggles loading state and forces remote refresh', () async {
+      await catalogRepository.syncCatalog(sourceId: 'olympus');
+      await cubit.load(
+        sourceId: 'olympus',
+        mangaId: 'academia-de-la-ascension',
+      );
+
+      expect(cubit.state.isReloading, isFalse);
+
+      final reloadFuture = cubit.reload();
+      expect(cubit.state.isReloading, isTrue);
+
+      await reloadFuture;
+
+      expect(cubit.state.isReloading, isFalse);
+      expect(catalogRepository.lastForceRefresh, isTrue);
+      expect(cubit.state.manga, isNotNull);
+      expect(cubit.state.manga!.chapters, isNotEmpty);
+    });
+
     test(
       'library updates preserve persisted read status when merging progress',
       () async {

@@ -336,6 +336,7 @@ void main() {
       final result = await repository.fetchMangaDetail(
         sourceId: sourceId,
         mangaId: 'slug',
+        forceRefresh: true,
       );
 
       expect(result.chapters, hasLength(2));
@@ -387,6 +388,121 @@ void main() {
 
       expect(result.id, equals('missing'));
       expect(result.chapters, hasLength(1));
+    });
+
+    test('returns cached detail without remote when not forced', () async {
+      const sourceId = 'olympus';
+      final mangaModel = MangaModel()
+        ..referenceId = 'slug'
+        ..sourceId = sourceId
+        ..title = 'Sample'
+        ..status = DownloadStatus.downloaded
+        ..totalChapters = 1;
+      final chapterModel = ChapterModel()
+        ..referenceId = 'chapter-1'
+        ..mangaReferenceId = 'slug'
+        ..sourceId = sourceId
+        ..title = 'Capítulo 1'
+        ..number = 1
+        ..status = DownloadStatus.downloaded;
+
+      when(() => local.getManga('slug')).thenAnswer((_) async => mangaModel);
+      when(
+        () => local.getChaptersForManga('slug'),
+      ).thenAnswer((_) async => [chapterModel]);
+      when(
+        () => local.getPagesForChapter('chapter-1'),
+      ).thenAnswer((_) async => const <PageImageModel>[]);
+
+      final result = await repository.fetchMangaDetail(
+        sourceId: sourceId,
+        mangaId: 'slug',
+      );
+
+      expect(result.id, equals('slug'));
+      expect(result.chapters, hasLength(1));
+      verifyNever(
+        () => remote.fetchAllChapters(mangaSlug: any(named: 'mangaSlug')),
+      );
+      verifyNever(
+        () => local.putManga(
+          any(),
+          chapters: any(named: 'chapters'),
+          pages: any(named: 'pages'),
+          replaceChapters: any(named: 'replaceChapters'),
+        ),
+      );
+    });
+
+    test('forces remote refresh when requested', () async {
+      const sourceId = 'olympus';
+      final mangaModel = MangaModel()
+        ..referenceId = 'slug'
+        ..sourceId = sourceId
+        ..title = 'Sample'
+        ..status = DownloadStatus.downloaded
+        ..totalChapters = 1;
+      final chapterModel = ChapterModel()
+        ..referenceId = 'chapter-1'
+        ..mangaReferenceId = 'slug'
+        ..sourceId = sourceId
+        ..title = 'Capítulo 1'
+        ..number = 1
+        ..status = DownloadStatus.downloaded;
+      final remoteChapters = [
+        const RemoteChapterSummary(
+          externalId: 'chapter-1',
+          mangaSlug: 'slug',
+          name: '1',
+          sourceId: sourceId,
+          sourceName: 'Olympus Biblioteca',
+          publishedAt: null,
+        ),
+        const RemoteChapterSummary(
+          externalId: 'chapter-2',
+          mangaSlug: 'slug',
+          name: '2',
+          sourceId: sourceId,
+          sourceName: 'Olympus Biblioteca',
+          publishedAt: null,
+        ),
+      ];
+
+      when(() => local.getManga('slug')).thenAnswer((_) async => mangaModel);
+      when(
+        () => local.getChaptersForManga('slug'),
+      ).thenAnswer((_) async => [chapterModel]);
+      when(
+        () => local.getPagesForChapter('chapter-1'),
+      ).thenAnswer((_) async => const <PageImageModel>[]);
+      when(
+        () => remote.fetchAllChapters(mangaSlug: 'slug'),
+      ).thenAnswer((_) async => remoteChapters);
+      when(
+        () => local.putManga(
+          any(),
+          chapters: any(named: 'chapters'),
+          pages: any(named: 'pages'),
+          replaceChapters: any(named: 'replaceChapters'),
+        ),
+      ).thenAnswer((_) async {});
+
+      final result = await repository.fetchMangaDetail(
+        sourceId: sourceId,
+        mangaId: 'slug',
+        forceRefresh: true,
+      );
+
+      expect(result.chapters, hasLength(2));
+      verify(() => remote.fetchAllChapters(mangaSlug: 'slug')).called(1);
+      verify(
+        () => local.putManga(
+          any(),
+          chapters: any(named: 'chapters'),
+          pages: any(named: 'pages'),
+          replaceChapters: true,
+        ),
+      ).called(1);
     });
 
     test('falls back to cached chapters when remote request fails', () async {

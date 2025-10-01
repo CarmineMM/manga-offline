@@ -97,6 +97,8 @@ class _ChapterListView extends StatelessWidget {
             status: state.status,
             filter: state.filter,
             canToggleFollow: loaded,
+            isReloading: state.isReloading,
+            canReload: state.manga != null,
           ),
         );
       },
@@ -111,6 +113,8 @@ class _ChapterListBody extends StatelessWidget {
     required this.status,
     required this.filter,
     required this.canToggleFollow,
+    required this.isReloading,
+    required this.canReload,
   });
 
   final Manga manga;
@@ -118,6 +122,8 @@ class _ChapterListBody extends StatelessWidget {
   final MangaDetailStatus status;
   final ChapterFilter filter;
   final bool canToggleFollow;
+  final bool isReloading;
+  final bool canReload;
 
   @override
   Widget build(BuildContext context) {
@@ -126,7 +132,12 @@ class _ChapterListBody extends StatelessWidget {
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
           sliver: SliverToBoxAdapter(
-            child: _MangaHeader(manga: manga, canToggleFollow: canToggleFollow),
+            child: _MangaHeader(
+              manga: manga,
+              canToggleFollow: canToggleFollow,
+              canReload: canReload,
+              isReloading: isReloading,
+            ),
           ),
         ),
         switch (status) {
@@ -256,10 +267,17 @@ class _ChapterListBody extends StatelessWidget {
 }
 
 class _MangaHeader extends StatelessWidget {
-  const _MangaHeader({required this.manga, required this.canToggleFollow});
+  const _MangaHeader({
+    required this.manga,
+    required this.canToggleFollow,
+    required this.canReload,
+    required this.isReloading,
+  });
 
   final Manga manga;
   final bool canToggleFollow;
+  final bool canReload;
+  final bool isReloading;
 
   @override
   Widget build(BuildContext context) {
@@ -278,6 +296,8 @@ class _MangaHeader extends StatelessWidget {
       onToggleFollow: canToggleFollow
           ? () => detailCubit.toggleFollowed()
           : null,
+      onReload: canReload ? () => detailCubit.reload() : null,
+      isReloading: isReloading,
     );
   }
 
@@ -301,6 +321,8 @@ class _MangaHeaderLayout extends StatefulWidget {
     required this.totalChapters,
     required this.isFollowed,
     required this.onToggleFollow,
+    required this.onReload,
+    required this.isReloading,
   });
 
   final String? coverImagePath;
@@ -311,6 +333,8 @@ class _MangaHeaderLayout extends StatefulWidget {
   final int totalChapters;
   final bool isFollowed;
   final VoidCallback? onToggleFollow;
+  final VoidCallback? onReload;
+  final bool isReloading;
 
   @override
   State<_MangaHeaderLayout> createState() => _MangaHeaderLayoutState();
@@ -326,6 +350,7 @@ class _MangaHeaderLayoutState extends State<_MangaHeaderLayout> {
 
     final hasSynopsis = widget.synopsis?.isNotEmpty == true;
     final synopsisText = widget.synopsis ?? '';
+    final actionButtons = _buildActionButtons(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -373,21 +398,10 @@ class _MangaHeaderLayoutState extends State<_MangaHeaderLayout> {
                         style: textTheme.labelLarge,
                       ),
                     ),
-                  if (widget.onToggleFollow != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: widget.isFollowed
-                          ? FilledButton.icon(
-                              onPressed: widget.onToggleFollow,
-                              icon: const Icon(Icons.favorite),
-                              label: const Text('Dejar de seguir'),
-                            )
-                          : OutlinedButton.icon(
-                              onPressed: widget.onToggleFollow,
-                              icon: const Icon(Icons.favorite_border),
-                              label: const Text('Seguir'),
-                            ),
-                    ),
+                  if (actionButtons.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 12),
+                    Wrap(spacing: 12, runSpacing: 8, children: actionButtons),
+                  ],
                 ],
               ),
             ),
@@ -430,6 +444,51 @@ class _MangaHeaderLayoutState extends State<_MangaHeaderLayout> {
           ),
       ],
     );
+  }
+
+  List<Widget> _buildActionButtons(BuildContext context) {
+    final buttons = <Widget>[];
+
+    if (widget.onToggleFollow != null) {
+      buttons.add(
+        widget.isFollowed
+            ? IconButton(
+                onPressed: widget.onToggleFollow,
+                icon: const Icon(Icons.favorite),
+                // label: const Text('Dejar de seguir'),
+              )
+            : IconButton.outlined(
+                onPressed: widget.onToggleFollow,
+                icon: const Icon(Icons.favorite_border),
+                // label: const Text('Seguir'),
+              ),
+      );
+    }
+
+    if (widget.onReload != null) {
+      final colorScheme = Theme.of(context).colorScheme;
+      final isLoading = widget.isReloading;
+      buttons.add(
+        FilledButton.icon(
+          onPressed: isLoading ? null : widget.onReload,
+          icon: isLoading
+              ? SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      colorScheme.onSurface,
+                    ),
+                  ),
+                )
+              : const Icon(Icons.refresh),
+          label: Text(isLoading ? 'Recargando…' : 'Recargar'),
+        ),
+      );
+    }
+
+    return buttons;
   }
 }
 

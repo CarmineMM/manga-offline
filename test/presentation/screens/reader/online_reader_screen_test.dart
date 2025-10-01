@@ -27,6 +27,7 @@ class _StubCatalogRepository implements CatalogRepository {
   Future<Manga> fetchMangaDetail({
     required String sourceId,
     required String mangaId,
+    bool forceRefresh = false,
   }) {
     throw UnimplementedError();
   }
