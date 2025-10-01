@@ -104,7 +104,10 @@ Future<void> configureDependencies() async {
     readingProgressDs = ReadingProgressDataSource(isar);
     final localDataSource = MangaLocalDataSource(isar);
     final sourceLocalDataSource = SourceLocalDataSource(isar);
-    mangaRepository = MangaRepositoryImpl(localDataSource: localDataSource);
+    mangaRepository = MangaRepositoryImpl(
+      localDataSource: localDataSource,
+      readingProgressDataSource: readingProgressDs,
+    );
     catalogRepository = CatalogRepositoryImpl(
       localDataSource: localDataSource,
       remoteDataSources: {olympusRemote.sourceId: olympusRemote},

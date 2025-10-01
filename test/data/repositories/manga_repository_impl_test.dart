@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:manga_offline/data/datasources/cache/reading_progress_datasource.dart';
 import 'package:manga_offline/data/datasources/manga_local_datasource.dart';
 import 'package:manga_offline/data/models/chapter_model.dart';
 import 'package:manga_offline/data/models/manga_model.dart';
@@ -11,8 +12,12 @@ import 'package:manga_offline/domain/entities/manga.dart';
 
 class _MockMangaLocalDataSource extends Mock implements MangaLocalDataSource {}
 
+class _MockReadingProgressDataSource extends Mock
+    implements ReadingProgressDataSource {}
+
 void main() {
   late _MockMangaLocalDataSource local;
+  late _MockReadingProgressDataSource readingProgress;
   late MangaRepositoryImpl repository;
 
   setUpAll(() {
@@ -29,7 +34,19 @@ void main() {
 
   setUp(() {
     local = _MockMangaLocalDataSource();
-    repository = MangaRepositoryImpl(localDataSource: local);
+    readingProgress = _MockReadingProgressDataSource();
+    when(() => readingProgress.watchAll()).thenAnswer(
+      (_) => Stream<List<ReadingProgressEntity>>.value(
+        const <ReadingProgressEntity>[],
+      ),
+    );
+    when(
+      () => readingProgress.getProgressForManga(any()),
+    ).thenAnswer((_) async => const <ReadingProgressEntity>[]);
+    repository = MangaRepositoryImpl(
+      localDataSource: local,
+      readingProgressDataSource: readingProgress,
+    );
     when(
       () => local.getPagesForChapter(any()),
     ).thenAnswer((_) async => const <PageImageModel>[]);

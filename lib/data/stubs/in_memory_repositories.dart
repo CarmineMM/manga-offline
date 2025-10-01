@@ -47,9 +47,13 @@ class InMemoryMangaRepository implements MangaRepository {
   @override
   Future<void> saveManga(Manga manga) async {
     final existing = _mangas[manga.id];
+    final readChapters = _countReadChapters(manga.chapters);
     final next = existing != null
-        ? manga.copyWith(isFollowed: existing.isFollowed)
-        : manga;
+        ? manga.copyWith(
+            isFollowed: existing.isFollowed,
+            readChapters: readChapters,
+          )
+        : manga.copyWith(readChapters: readChapters);
     _mangas[manga.id] = next;
     _emit();
   }
@@ -100,6 +104,7 @@ class InMemoryMangaRepository implements MangaRepository {
     final downloadedCount = chapters
         .where((element) => element.status == DownloadStatus.downloaded)
         .length;
+    final readCount = _countReadChapters(chapters);
 
     final totalChapters = existing.totalChapters == 0
         ? chapters.length
@@ -117,6 +122,7 @@ class InMemoryMangaRepository implements MangaRepository {
       downloadedChapters: downloadedCount,
       status: status,
       totalChapters: totalChapters,
+      readChapters: readCount,
     );
     _emit();
   }
@@ -150,6 +156,7 @@ class InMemoryMangaRepository implements MangaRepository {
       status: DownloadStatus.downloaded,
       downloadedChapters: chapters.length,
       chapters: chapters,
+      readChapters: _countReadChapters(chapters),
     );
     _emit();
   }
@@ -268,12 +275,23 @@ class InMemoryMangaRepository implements MangaRepository {
         chapters: chapters,
         downloadedChapters: downloadedCount,
         status: status,
+        readChapters: _countReadChapters(chapters),
       );
     }
 
     if (changed) {
       _emit();
     }
+  }
+
+  int _countReadChapters(List<Chapter> chapters) {
+    var total = 0;
+    for (final chapter in chapters) {
+      if ((chapter.lastReadPage ?? 0) > 0 || chapter.lastReadAt != null) {
+        total += 1;
+      }
+    }
+    return total;
   }
 
   /// Seeds the repository with placeholder content.

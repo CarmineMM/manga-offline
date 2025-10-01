@@ -39,6 +39,9 @@ class MangaLibraryTile extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final progress = _computeProgress();
+    final readChapters = manga.readChaptersCount;
+    final totalChapters = manga.resolvedTotalChapters;
+    final showReadSummary = totalChapters > 0 || readChapters > 0;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -86,6 +89,14 @@ class MangaLibraryTile extends StatelessWidget {
                       ),
                     const SizedBox(height: 12),
                     _DownloadStatusChip(status: manga.status),
+                    if (showReadSummary)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Capítulos leídos: $readChapters/$totalChapters',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
                     if (manga.totalChapters > 0)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
@@ -98,14 +109,14 @@ class MangaLibraryTile extends StatelessWidget {
                               '${manga.downloadedChapters}/${manga.totalChapters} capítulos listos',
                               style: theme.textTheme.bodySmall,
                             ),
-                            if (showDownloadProgressDetails)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Text(
-                                  _remainingChaptersLabel(),
-                                  style: theme.textTheme.bodySmall,
-                                ),
-                              ),
+                            // if (showDownloadProgressDetails)
+                            //   Padding(
+                            //     padding: const EdgeInsets.only(top: 2),
+                            //     child: Text(
+                            //       _remainingChaptersLabel(),
+                            //       style: theme.textTheme.bodySmall,
+                            //     ),
+                            //   ),
                           ],
                         ),
                       )

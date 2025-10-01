@@ -33,6 +33,9 @@ class Manga {
   /// Number of chapters that are fully downloaded and available offline.
   final int downloadedChapters;
 
+  /// Number of chapters where the user has recorded reading progress.
+  final int readChapters;
+
   /// Timestamp of the last metadata update.
   final DateTime? lastUpdated;
 
@@ -57,6 +60,7 @@ class Manga {
     this.status = DownloadStatus.notDownloaded,
     this.totalChapters = 0,
     this.downloadedChapters = 0,
+    this.readChapters = 0,
     this.lastUpdated,
     this.isFavorite = false,
     this.isFollowed = false,
@@ -75,6 +79,7 @@ class Manga {
     DownloadStatus? status,
     int? totalChapters,
     int? downloadedChapters,
+    int? readChapters,
     DateTime? lastUpdated,
     bool? isFavorite,
     bool? isFollowed,
@@ -91,10 +96,36 @@ class Manga {
       status: status ?? this.status,
       totalChapters: totalChapters ?? this.totalChapters,
       downloadedChapters: downloadedChapters ?? this.downloadedChapters,
+      readChapters: readChapters ?? this.readChapters,
       lastUpdated: lastUpdated ?? this.lastUpdated,
       isFavorite: isFavorite ?? this.isFavorite,
       isFollowed: isFollowed ?? this.isFollowed,
       chapters: chapters ?? this.chapters,
     );
+  }
+
+  /// Counts the chapters marked as read either by timestamp or stored page.
+  int get readChaptersCount {
+    if (readChapters > 0) {
+      return readChapters;
+    }
+    var total = 0;
+    for (final chapter in chapters) {
+      if ((chapter.lastReadPage ?? 0) > 0 || chapter.lastReadAt != null) {
+        total += 1;
+      }
+    }
+    return total;
+  }
+
+  /// Resolves a non-zero total chapter count using known chapters as fallback.
+  int get resolvedTotalChapters {
+    if (totalChapters > 0) {
+      return totalChapters;
+    }
+    if (chapters.isNotEmpty) {
+      return chapters.length;
+    }
+    return 0;
   }
 }

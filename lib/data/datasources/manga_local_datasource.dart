@@ -374,6 +374,12 @@ class MangaLocalDataSource {
     final downloadedChapters = chapters
         .where((chapter) => chapter.status == DownloadStatus.downloaded)
         .length;
+    final readChapters = chapters
+        .where(
+          (chapter) =>
+              (chapter.lastReadPage ?? 0) > 0 || chapter.lastReadAt != null,
+        )
+        .length;
 
     if (downloadedChapters == 0) {
       manga.status = DownloadStatus.notDownloaded;
@@ -385,6 +391,10 @@ class MangaLocalDataSource {
     }
 
     manga.downloadedChapters = downloadedChapters;
+    manga.readChapters = readChapters;
+    if (manga.totalChapters == 0 && chapters.isNotEmpty) {
+      manga.totalChapters = chapters.length;
+    }
     manga.lastUpdated = DateTime.now();
     await _mangaCollection.put(manga);
   }

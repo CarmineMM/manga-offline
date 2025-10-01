@@ -43,6 +43,9 @@ class MangaModel {
   /// Number of chapters already downloaded.
   int downloadedChapters = 0;
 
+  /// Number of chapters with recorded reading progress.
+  int readChapters = 0;
+
   /// Timestamp of the last metadata update.
   DateTime? lastUpdated;
 
@@ -68,6 +71,7 @@ class MangaModel {
         status: status,
         totalChapters: totalChapters,
         downloadedChapters: downloadedChapters,
+        readChapters: readChapters,
         lastUpdated: lastUpdated,
         isFavorite: isFavorite,
         isFollowed: isFollowed,
@@ -87,6 +91,7 @@ class MangaModel {
       ..status = manga.status
       ..totalChapters = manga.totalChapters
       ..downloadedChapters = manga.downloadedChapters
+      ..readChapters = manga.readChapters
       ..lastUpdated = manga.lastUpdated
       ..isFavorite = manga.isFavorite
       ..isFollowed = manga.isFollowed

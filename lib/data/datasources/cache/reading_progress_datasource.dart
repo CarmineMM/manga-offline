@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:isar/isar.dart';
 
 part 'reading_progress_datasource.g.dart';
@@ -15,14 +17,34 @@ class ReadingProgressEntity {
 
 /// DataSource for reading progress.
 class ReadingProgressDataSource {
-  ReadingProgressDataSource(Isar isar) : _isar = isar, _memoryStore = null;
+  ReadingProgressDataSource(Isar isar)
+    : _isar = isar,
+      _memoryStore = null,
+      _memoryController = null;
 
   ReadingProgressDataSource.inMemory()
     : _isar = null,
-      _memoryStore = <String, ReadingProgressEntity>{};
+      _memoryStore = <String, ReadingProgressEntity>{},
+      _memoryController =
+          StreamController<List<ReadingProgressEntity>>.broadcast() {
+    _memoryController!.onListen = _emitMemorySnapshot;
+  }
 
   final Isar? _isar;
   final Map<String, ReadingProgressEntity>? _memoryStore;
+  final StreamController<List<ReadingProgressEntity>>? _memoryController;
+
+  Stream<List<ReadingProgressEntity>> watchAll() {
+    final isar = _isar;
+    if (isar != null) {
+      return isar.readingProgressEntitys
+          .watchLazy(fireImmediately: true)
+          .asyncMap((_) => isar.readingProgressEntitys.where().findAll());
+    }
+    final controller = _memoryController!;
+    _emitMemorySnapshot();
+    return controller.stream;
+  }
 
   Future<void> upsertProgress({
     required String sourceId,
@@ -66,6 +88,7 @@ class ReadingProgressDataSource {
     entity.lastReadPage = lastReadPage;
     entity.lastReadAt = DateTime.now();
     store[chapterId] = entity;
+    _emitMemorySnapshot();
   }
 
   Future<ReadingProgressEntity?> getProgress(String chapterId) {
@@ -108,5 +131,15 @@ class ReadingProgressDataSource {
       return;
     }
     _memoryStore?.remove(chapterId);
+    _emitMemorySnapshot();
+  }
+
+  void _emitMemorySnapshot() {
+    final controller = _memoryController;
+    final store = _memoryStore;
+    if (controller == null || store == null || controller.isClosed) {
+      return;
+    }
+    controller.add(store.values.toList(growable: false));
   }
 }

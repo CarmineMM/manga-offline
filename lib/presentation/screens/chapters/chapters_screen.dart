@@ -284,6 +284,8 @@ class _MangaHeader extends StatelessWidget {
     final coverPath = manga.coverImagePath;
     final coverUrl = manga.coverImageUrl;
     final detailCubit = context.read<MangaDetailCubit>();
+    final resolvedTotal = manga.resolvedTotalChapters;
+    final readChapters = manga.readChaptersCount;
 
     return _MangaHeaderLayout(
       coverImagePath: coverPath,
@@ -291,7 +293,8 @@ class _MangaHeader extends StatelessWidget {
       title: manga.title,
       sourceLabel: _resolveSourceLabel(manga),
       synopsis: manga.synopsis,
-      totalChapters: manga.totalChapters,
+      totalChapters: resolvedTotal,
+      readChapters: readChapters,
       isFollowed: manga.isFollowed,
       onToggleFollow: canToggleFollow
           ? () => detailCubit.toggleFollowed()
@@ -319,6 +322,7 @@ class _MangaHeaderLayout extends StatefulWidget {
     required this.sourceLabel,
     required this.synopsis,
     required this.totalChapters,
+    required this.readChapters,
     required this.isFollowed,
     required this.onToggleFollow,
     required this.onReload,
@@ -331,6 +335,7 @@ class _MangaHeaderLayout extends StatefulWidget {
   final String sourceLabel;
   final String? synopsis;
   final int totalChapters;
+  final int readChapters;
   final bool isFollowed;
   final VoidCallback? onToggleFollow;
   final VoidCallback? onReload;
@@ -351,6 +356,9 @@ class _MangaHeaderLayoutState extends State<_MangaHeaderLayout> {
     final hasSynopsis = widget.synopsis?.isNotEmpty == true;
     final synopsisText = widget.synopsis ?? '';
     final actionButtons = _buildActionButtons(context);
+    final readChapters = widget.readChapters;
+    final totalChapters = widget.totalChapters;
+    final showReadSummary = totalChapters > 0 || readChapters > 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -390,11 +398,11 @@ class _MangaHeaderLayoutState extends State<_MangaHeaderLayout> {
                       ),
                     ],
                   ),
-                  if (widget.totalChapters > 0)
+                  if (showReadSummary)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(
-                        '${widget.totalChapters} capítulos',
+                        'Capítulos leídos: $readChapters/$totalChapters',
                         style: textTheme.labelLarge,
                       ),
                     ),

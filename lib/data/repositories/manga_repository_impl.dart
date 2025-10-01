@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:manga_offline/data/datasources/cache/reading_progress_datasource.dart';
 import 'package:manga_offline/data/datasources/manga_local_datasource.dart';
 import 'package:manga_offline/data/models/chapter_model.dart';
 import 'package:manga_offline/data/models/manga_model.dart';
@@ -12,31 +13,69 @@ import 'package:manga_offline/domain/repositories/manga_repository.dart';
 /// Concrete implementation of [MangaRepository] backed by Isar.
 class MangaRepositoryImpl implements MangaRepository {
   /// Creates the repository with its required [localDataSource].
-  MangaRepositoryImpl({required MangaLocalDataSource localDataSource})
-    : _localDataSource = localDataSource;
+  MangaRepositoryImpl({
+    required MangaLocalDataSource localDataSource,
+    required ReadingProgressDataSource readingProgressDataSource,
+  }) : _localDataSource = localDataSource,
+       _readingProgressDataSource = readingProgressDataSource;
 
   final MangaLocalDataSource _localDataSource;
+  final ReadingProgressDataSource _readingProgressDataSource;
 
   @override
   Stream<List<Manga>> watchLocalLibrary() {
-    return _localDataSource.watchMangas().asyncMap((models) async {
-      final result = <Manga>[];
-      for (final model in models) {
-        final chapterModels = await _localDataSource.getChaptersForManga(
-          model.referenceId,
-        );
-        final chapters = <Chapter>[];
-        for (final chapterModel in chapterModels) {
-          final pages = await _localDataSource.getPagesForChapter(
-            chapterModel.referenceId,
-          );
-          chapters.add(chapterModel.toEntity(pages: pages));
-        }
+    return Stream.multi((controller) {
+      var latestModels = const <MangaModel>[];
+      var latestProgress = const <ReadingProgressEntity>[];
+      var closed = false;
 
-        final entity = model.toEntity().copyWith(chapters: chapters);
-        result.add(entity);
+      Future<void> emitCombined() async {
+        if (closed) return;
+        try {
+          final result = await _buildMangaEntities(
+            latestModels,
+            latestProgress,
+          );
+          if (!controller.isClosed) {
+            controller.add(result);
+          }
+        } catch (error, stackTrace) {
+          if (!controller.isClosed) {
+            controller.addError(error, stackTrace);
+          }
+        }
       }
-      return result;
+
+      final mangaSubscription = _localDataSource.watchMangas().listen(
+        (models) {
+          latestModels = models;
+          unawaited(emitCombined());
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (!controller.isClosed) {
+            controller.addError(error, stackTrace);
+          }
+        },
+      );
+
+      final progressSubscription = _readingProgressDataSource.watchAll().listen(
+        (progress) {
+          latestProgress = progress;
+          unawaited(emitCombined());
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (!controller.isClosed) {
+            controller.addError(error, stackTrace);
+          }
+        },
+      );
+
+      controller.onListen = () => unawaited(emitCombined());
+      controller.onCancel = () async {
+        closed = true;
+        await mangaSubscription.cancel();
+        await progressSubscription.cancel();
+      };
     });
   }
 
@@ -73,15 +112,10 @@ class MangaRepositoryImpl implements MangaRepository {
     if (model == null) {
       return null;
     }
-    final chapterModels = await _localDataSource.getChaptersForManga(mangaId);
-    final chapters = <Chapter>[];
-    for (final chapterModel in chapterModels) {
-      final pages = await _localDataSource.getPagesForChapter(
-        chapterModel.referenceId,
-      );
-      chapters.add(chapterModel.toEntity(pages: pages));
-    }
-    return model.toEntity(chapters: chapterModels).copyWith(chapters: chapters);
+    final progress = await _readingProgressDataSource.getProgressForManga(
+      mangaId,
+    );
+    return _mapModelToEntity(model, progress);
   }
 
   @override
@@ -145,5 +179,81 @@ class MangaRepositoryImpl implements MangaRepository {
     required bool isFollowed,
   }) {
     return _localDataSource.setMangaFollowed(mangaId, isFollowed);
+  }
+
+  int _countReadChapters(List<Chapter> chapters) {
+    var total = 0;
+    for (final chapter in chapters) {
+      if ((chapter.lastReadPage ?? 0) > 0 || chapter.lastReadAt != null) {
+        total += 1;
+      }
+    }
+    return total;
+  }
+
+  Future<List<Manga>> _buildMangaEntities(
+    List<MangaModel> models,
+    List<ReadingProgressEntity> progress,
+  ) async {
+    if (models.isEmpty) {
+      return const <Manga>[];
+    }
+    final progressByManga = <String, List<ReadingProgressEntity>>{};
+    for (final entry in progress) {
+      final list = progressByManga.putIfAbsent(
+        entry.mangaId,
+        () => <ReadingProgressEntity>[],
+      );
+      list.add(entry);
+    }
+
+    final result = <Manga>[];
+    for (final model in models) {
+      final mapped = await _mapModelToEntity(
+        model,
+        progressByManga[model.referenceId] ?? const <ReadingProgressEntity>[],
+      );
+      result.add(mapped);
+    }
+    return result;
+  }
+
+  Future<Manga> _mapModelToEntity(
+    MangaModel model,
+    List<ReadingProgressEntity> progress,
+  ) async {
+    final chapterModels = await _localDataSource.getChaptersForManga(
+      model.referenceId,
+    );
+    final progressMap = <String, ReadingProgressEntity>{
+      for (final entry in progress) entry.chapterId: entry,
+    };
+
+    final chapters = <Chapter>[];
+    for (final chapterModel in chapterModels) {
+      final pages = await _localDataSource.getPagesForChapter(
+        chapterModel.referenceId,
+      );
+      var chapter = chapterModel.toEntity(pages: pages);
+      final progressEntry = progressMap[chapter.id];
+      if (progressEntry != null) {
+        chapter = chapter.copyWith(
+          lastReadPage: progressEntry.lastReadPage,
+          lastReadAt: progressEntry.lastReadAt,
+        );
+      }
+      chapters.add(chapter);
+    }
+
+    final readChapters = _countReadChapters(chapters);
+    final totalChapters = model.totalChapters != 0
+        ? model.totalChapters
+        : chapters.length;
+
+    return model.toEntity().copyWith(
+      chapters: chapters,
+      readChapters: readChapters,
+      totalChapters: totalChapters,
+    );
   }
 }

@@ -32,6 +32,7 @@ void main() {
       ),
     );
 
+    expect(find.text('Capítulos leídos: 0/5'), findsOneWidget);
     expect(find.text('3 capítulos pendientes por descargar'), findsOneWidget);
     expect(find.text('2/5 capítulos listos'), findsOneWidget);
   });
@@ -59,11 +60,32 @@ void main() {
       ),
     );
 
+    expect(find.text('Capítulos leídos: 0/4'), findsOneWidget);
     expect(find.text('4/4 capítulos listos'), findsOneWidget);
     expect(
       find.text('Todos los capítulos están disponibles offline'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('shows read chapters summary even without totals', (
+    tester,
+  ) async {
+    const manga = Manga(
+      id: 'reading-progress',
+      sourceId: 'olympus',
+      title: 'Reading Progress',
+      status: DownloadStatus.notDownloaded,
+      readChapters: 2,
+    );
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(body: MangaLibraryTile(manga: manga)),
+      ),
+    );
+
+    expect(find.text('Capítulos leídos: 2/0'), findsOneWidget);
   });
 
   testWidgets('uses local cover image when cached path exists', (tester) async {
